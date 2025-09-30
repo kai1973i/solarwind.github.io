@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solarwind-Plasma-Daten und Substorm-Kopplungsindex</title>
+    <title>Solarwind-Plasma-Daten und Substurm-Kopplungsindex</title>
     <!-- Tailwind CSS laden -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -33,33 +33,13 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* HIGHTLIGHT-KLASSE: Markiert Daten, deren Ankunft theoretisch bereits erfolgt ist (dezente Hervorhebung) */
+        /* HIGHTLIGHT-KLASSE: Markiert Daten, deren Ankunft theoretisch bereits erfolgt ist */
         .highlight-row {
             background-color: #1a222e; /* Dunkler, dezenter Blauton */
-            border-left: 4px solid #3b82f6; /* Subtiler blauer Rand (passend zur Header-Farbe) */
+            border-left: 4px solid #3b82f6; /* Subtiler blauer Rand */
         }
         .highlight-row:hover {
-            background-color: #242c38 !important; /* Etwas heller beim Hover */
-        }
-        .llm-loading {
-            width: 1rem;
-            height: 1rem;
-        }
-        .llm-btn {
-            background-color: #4f46e5;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            transition: background-color 0.2s, transform 0.1s;
-        }
-        .llm-btn:hover {
-            background-color: #4338ca;
-            transform: translateY(-1px);
-        }
-        .llm-btn:disabled {
-            background-color: #312e81;
-            cursor: not-allowed;
-            transform: none;
+            background-color: #242c38 !important;
         }
         .substorm-watch-high {
             background-color: #450a0a !important; /* Dunkelrot */
@@ -113,28 +93,43 @@
                             <span data-sort-icon="dynamic_pressure_npa" class="ml-1"></span>
                         </th>
                         <!-- Magnetfelddaten -->
-                        <th class="py-3 px-6 text-left header-cell" data-sort-key="by_nt">
-                            By (nT)
-                            <span data-sort-icon="by_nt" class="ml-1"></span>
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="total_bt">
+                            Total Bt (nT)
+                            <span data-sort-icon="total_bt" class="ml-1"></span>
                         </th>
                         <th class="py-3 px-6 text-left header-cell" data-sort-key="bz_nt">
                             Bz (nT)
                             <span data-sort-icon="bz_nt" class="ml-1"></span>
                         </th>
-                        <!-- NEU: Substorm Coupling Index -->
+                        <!-- SCI -->
                         <th class="py-3 px-6 text-left header-cell" data-sort-key="substorm_coupling_index">
-                            ⚡ SCI
+                            ⚡ SCI (V·Bs)
                             <span data-sort-icon="substorm_coupling_index" class="ml-1"></span>
                         </th>
-                        <!-- NEUE SPALTE: Substurm-Risiko -->
+                        <!-- Kritische Aufbauzeit -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="critical_buildup_duration_h">
+                            Krit. Aufbauzeit (h)
+                            <span data-sort-icon="critical_buildup_duration_h" class="ml-1"></span>
+                        </th>
+                        <!-- Geschätzte Sturmbeginn-Zeit -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="estimated_onset_time">
+                            Gesch. Sturmbeginn (UTC)
+                            <span data-sort-icon="estimated_onset_time" class="ml-1"></span>
+                        </th>
+                        <!-- Substurm-Risiko -->
                         <th class="py-3 px-6 text-left header-cell" data-sort-key="sci_risk_level">
-                            Substurm-Risiko
+                            Risiko-Level
                             <span data-sort-icon="sci_risk_level" class="ml-1"></span>
                         </th>
                         <!-- Ankunftszeit -->
                         <th class="py-3 px-6 text-left header-cell" data-sort-key="arrival_time">
                             Gesch. Ankunftszeit (Erde)
                             <span data-sort-icon="arrival_time" class="ml-1"></span>
+                        </th>
+                         <!-- Laufzeit (Minuten) -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="travel_time_m">
+                            Laufzeit (min)
+                            <span data-sort-icon="travel_time_m" class="ml-1"></span>
                         </th>
                         <th class="py-3 px-6 text-left header-cell" data-sort-key="travel_time_h">
                             Laufzeit (h)
@@ -148,63 +143,22 @@
             </table>
         </div>
 
-        <!-- Gemini LLM Analyse Sektion -->
-        <div class="mt-10 p-6 bg-gray-800 rounded-lg shadow-xl border border-blue-700/50">
-            <h2 class="text-2xl font-bold mb-4 text-blue-300">
-                ✨ Gemini KI-Analyse & Meldung
-            </h2>
-            <p class="text-gray-400 mb-4">
-                Nutze die KI, um die letzten Solardaten zu interpretieren und eine Meldung zu entwerfen.
-            </p>
-            <div class="flex flex-wrap gap-4 mb-6">
-                <button id="summarize-btn" class="llm-btn flex items-center">
-                    <span id="summarize-spinner" class="loading-animation llm-loading mr-2 hidden"></span>
-                    ✨ Raumwetter zusammenfassen
-                </button>
-                <button id="alert-draft-btn" class="llm-btn flex items-center">
-                    <span id="alert-spinner" class="loading-animation llm-loading mr-2 hidden"></span>
-                    ✨ Alarmmeldung entwerfen
-                </button>
-                <!-- NEUER BUTTON: Infrastruktur-Auswirkungen bewerten -->
-                <button id="impact-btn" class="llm-btn flex items-center">
-                    <span id="impact-spinner" class="loading-animation llm-loading mr-2 hidden"></span>
-                    ✨ Infrastruktur-Auswirkungen bewerten
-                </button>
-            </div>
-
-            <!-- Output-Bereich -->
-            <div id="llm-output" class="mt-4 p-4 bg-gray-900 border border-gray-700 rounded-lg hidden">
-                <h3 class="text-xl font-semibold mb-2 text-white" id="llm-title"></h3>
-                <div id="llm-content" class="text-gray-300 whitespace-pre-wrap"></div>
-                <div id="llm-sources" class="mt-4 text-xs text-gray-500"></div>
-                <button id="copy-btn" class="llm-btn mt-4 py-2 px-4 text-sm hidden">
-                    In Zwischenablage kopieren
-                </button>
-                <div id="copy-message" class="text-green-400 text-sm mt-2 hidden">Kopiert!</div>
-            </div>
-            <!-- Fehlermeldungen für LLM-Aufrufe -->
-            <div id="llm-error" class="mt-4 p-4 bg-red-900/50 text-red-300 border border-red-700 rounded-lg hidden"></div>
-        </div>
-        <!-- Ende Gemini LLM Analyse Sektion -->
-
         <p class="mt-6 text-xs text-gray-500">
             <span class="font-bold text-blue-400">Hervorgehobene Zeilen</span> (blaue Markierung) sind bereits auf der Erde **angekommen**.<br>
             <span class="font-bold text-blue-300">🔜</span> in der Ankunftszeit: Der Solarwind wird **innerhalb der nächsten 30 Minuten** erwartet.<br>
             <span class="font-bold text-pink-400">🏎️ ÜBERHOLT!</span>: Ein später gemessener Plasmaabschnitt wird **früher** erwartet, was auf eine **Geschwindigkeitsfront** hindeutet.<br>
-            <span class="font-bold text-red-400">⬇️ Bz</span>: Zeigt die **Südrichtung** des Magnetfelds an, ein kritischer Indikator für geomagnetische Aktivität und Substürme.<br>
+            <span class="font-bold text-yellow-300">Total Bt (nT)</span>: Der **Gesamtwert** des Magnetfelds. Werte **über $15\text{ nT}$** sind hoch (oft assoziiert mit Stoßwellen).
+            <br><span class="font-bold text-red-400">⬇️ Bz</span>: Zeigt die **Südrichtung** des Magnetfelds an, ein kritischer Indikator für geomagnetische Aktivität und Substürme.<br>
             <span class="font-bold text-yellow-300">💥 STAU! Dyn. Druck</span>: Zeigt eine **starke Kompressionszone (SIR/Stoßwelle)** an (Dichte > $15\text{ p/cm}^3$ und Druck > $5\text{ nPa}$).<br>
             <span class="font-bold text-red-400">Dyn. Druck (nPa)</span>: Werte **über $10\text{ nPa}$** sind stark erhöht und deuten auf eine erhebliche Magnetosphären-Kompression hin.<br>
-            <span class="font-bold text-red-400">🚨 SCI (Kopplungsindex)</span>: Hohe Werte (**> 3500**) signalisieren ein **hohes Potenzial für Substürme** (starke Polarlichter).
+            <span class="font-bold text-red-400">🚨 SCI (V·Bs)</span>: Hohe Werte (**> 3500**) signalisieren ein **hohes Potenzial für Substürme** (starke Polarlichter).
+            <br><span class="font-bold text-red-400">Krit. Aufbauzeit (h)</span>: Die **Mindestdauer**, die dieser Zustand anhalten muss, um einen Sturm auszulösen. **Niedrigere Werte sind kritischer.**
+            <br><span class="font-bold text-red-300">⚠️ Gesch. Sturmbeginn</span>: Die **geschätzte früheste Zeit** für den **Beginn des geomagnetischen Sturms** (Ankunft + Aufbauzeit).
             <br>Hinweis: Die Daten werden vom NOAA Space Weather Prediction Center (SWPC) bereitgestellt und am L1-Punkt gemessen. Die Tabelle wird jede Minute automatisch aktualisiert.
         </p>
     </div>
 
     <script type="module">
-        // --- Globale Firebase/App-Konstanten (werden vom Canvas bereitgestellt) ---
-        const apiKey = "" // API-Schlüssel für Gemini
-        const GEMINI_MODEL = 'gemini-2.5-flash-preview-05-20';
-        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-        
         // --- Anwendungskonstanten ---
         const PLASMA_API_URL = 'https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json';
         const MAG_API_URL = 'https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json';
@@ -214,7 +168,6 @@
         const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
         const THIRTY_MINUTES_MS = 30 * 60 * 1000;
         const REFRESH_INTERVAL_MS = 60 * 1000;
-        const CRITICAL_DATA_POINTS = 5; // Anzahl der neuesten Datenpunkte für die KI-Analyse
         
         // Konstante für die Berechnung des Dynamischen Drucks in nPa
         // Formel: P_dyn (nPa) ≈ 1.672 * 10^-6 * Density (p/cm³) * Speed (km/s)^2
@@ -222,11 +175,18 @@
         const CRITICAL_PRESSURE_NPA = 10.0; // Schwellenwert für starke Kompression
         const CRITICAL_DENSITY = 15.0; // Schwellenwert für Kompressions-Ereignisse (SIR/Stoßwelle)
 
-        // NEUE KONSTANTEN FÜR SUBSTORM COUPLING INDEX (SCI)
-        // Formel: SCI ≈ Speed * max(0, -Bz) - Vereinfachte Kopplungsfunktion V * Bs
+        // KONSTANTEN FÜR SUBSTORM COUPLING INDEX (SCI)
+        // SCI ≈ Speed * max(0, -Bz) - Vereinfachte Kopplungsfunktion V * Bs
         const SCI_WATCH_LOW = 1000; 
         const SCI_WATCH_ELEVATED = 2000; 
         const SCI_WATCH_HIGH = 3500; 
+        
+        // KONSTANTEN FÜR KRITISCHE AUFBAUZEIT (VEREINFACHTE REGELN)
+        const SCI_DURATION_HIGH_H = 1.75; // 1.5 bis 2.0 Stunden
+        const SCI_DURATION_ELEVATED_H = 2.5; // 2.0 bis 3.0 Stunden
+        const SCI_DURATION_MEDIUM_H = 3.0; // ca. 3.0 Stunden
+        const SCI_DURATION_LOW_H = 100.0; // Platzhalter für > 3.0 h (zum Sortieren)
+        const CRITICAL_BT = 15.0; // Schwellenwert für hohes Totalfeld
 
         // --- DOM-Elemente ---
         const tableBody = document.getElementById('table-body');
@@ -234,23 +194,6 @@
         const loadingIndicator = document.getElementById('loading-indicator');
         const statusMessage = document.getElementById('status-message');
         const headers = document.querySelectorAll('.header-cell');
-
-        const summarizeBtn = document.getElementById('summarize-btn');
-        const summarizeSpinner = document.getElementById('summarize-spinner');
-        const alertDraftBtn = document.getElementById('alert-draft-btn');
-        const alertSpinner = document.getElementById('alert-spinner');
-        
-        // NEUE DOM-ELEMENTE FÜR INFRASTRUKTUR-ANALYSE
-        const impactBtn = document.getElementById('impact-btn');
-        const impactSpinner = document.getElementById('impact-spinner');
-
-        const llmOutput = document.getElementById('llm-output');
-        const llmTitle = document.getElementById('llm-title');
-        const llmContent = document.getElementById('llm-content');
-        const llmSources = document.getElementById('llm-sources');
-        const llmError = document.getElementById('llm-error');
-        const copyBtn = document.getElementById('copy-btn');
-        const copyMessage = document.getElementById('copy-message');
 
         let allData = [];
         let sortColumn = 'time_tag';
@@ -265,10 +208,20 @@
          */
         const getSciRiskLevel = (sci) => {
             if (typeof sci !== 'number' || sci < 0) return 'N/A';
-            if (sci >= SCI_WATCH_HIGH) return '🚨 HOCH';
-            if (sci >= SCI_WATCH_ELEVATED) return '⚠️ Erhöht';
-            if (sci >= SCI_WATCH_LOW) return 'Mittel';
+            if (sci >= SCI_WATCH_HIGH) return '🚨 HOCH (> 3500)';
+            if (sci >= SCI_WATCH_ELEVATED) return '⚠️ Erhöht (> 2000)';
+            if (sci >= SCI_WATCH_LOW) return 'Mittel (> 1000)';
             return 'Gering';
+        };
+
+        /**
+         * Liefert die kritische Dauer in Stunden (als Zahl) basierend auf dem SCI-Wert.
+         */
+        const getRequiredBuildupDuration = (sci) => {
+            if (typeof sci !== 'number' || sci < SCI_WATCH_LOW) return SCI_DURATION_LOW_H; 
+            if (sci >= SCI_WATCH_HIGH) return SCI_DURATION_HIGH_H;
+            if (sci >= SCI_WATCH_ELEVATED) return SCI_DURATION_ELEVATED_H;
+            return SCI_DURATION_MEDIUM_H; 
         };
 
         /**
@@ -293,327 +246,83 @@
         };
 
         /**
-         * Formatiert Zeitstempel nur mit Uhrzeit
-         */
-        const formatTimeOnly = (date) => {
-            if (!(date instanceof Date) || isNaN(date)) return 'N/A';
-            const options = {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false,
-                timeZone: 'UTC'
-            };
-            return date.toLocaleString('de-DE', options) + ' UTC';
-        };
-
-
-        /**
-         * Führt die Berechnung der geschätzten Ankunftszeit, des Dynamischen Drucks und des SCI durch
+         * Führt die Berechnung der geschätzten Ankunftszeit, des Dynamischen Drucks, 
+         * des SCI und der geschätzten Sturmbeginn-Zeit durch
          */
         const calculateArrival = (entry) => {
             const speed = parseFloat(entry.speed);
             const density = parseFloat(entry.density);
+            const bx = parseFloat(entry.bx_nt);
+            const by = parseFloat(entry.by_nt);
             const bz = parseFloat(entry.bz_nt);
             const timeTag = entry.time_tag;
 
-            // 1. Berechnung des Dynamischen Drucks (nPa)
+            // 1. Berechnung des Magnetischen Totalwerts (Bt)
+            let totalBt = 'N/A';
+            if (!isNaN(bx) && !isNaN(by) && !isNaN(bz)) {
+                totalBt = Math.sqrt(bx*bx + by*by + bz*bz);
+            } else if (entry.bt_nt) {
+                 totalBt = parseFloat(entry.bt_nt); // Falls Bt direkt verfügbar ist
+            }
+
+            // 2. Berechnung des Dynamischen Drucks (nPa)
             let dynamicPressure = 'N/A';
             if (!isNaN(speed) && speed > 0 && !isNaN(density) && density >= 0) {
                 dynamicPressure = DYNAMIC_PRESSURE_FACTOR * density * (speed * speed);
             }
             
-            // 2. Berechnung des Substorm Coupling Index (SCI)
+            // 3. Berechnung des Substorm Coupling Index (SCI)
             let sci = 'N/A';
             if (!isNaN(speed) && speed > 0 && !isNaN(bz)) {
                 // SCI = Speed * max(0, -Bz) -> Nur relevant, wenn Bz südlich (negativ) ist
                 sci = speed * Math.max(0, -bz);
             }
 
-            // 3. Qualitative Risikobewertung
+            // 4. Qualitative Risikobewertung
             const sciRiskLevel = getSciRiskLevel(sci);
+
+            // 5. Kritische Aufbauzeit (vereinfachte Regel)
+            const criticalBuildupDuration = getRequiredBuildupDuration(sci);
             
-            // 4. Berechnung der Ankunftszeit (nur wenn Geschwindigkeit gültig)
+            // 6. Berechnung der Ankunftszeit (nur wenn Geschwindigkeit gültig)
             let travelTimeHours = 'N/A';
+            let travelTimeMinutes = 'N/A';
             let travelTimeMs = null;
             let arrivalDate = 'Ungültige Geschw.';
+            let estimatedOnset = 'N/A';
 
             if (!isNaN(speed) && speed > 0 && speed <= 10000) {
                 const travelTimeSeconds = L1_DISTANCE_KM / speed;
                 travelTimeHours = travelTimeSeconds / 3600;
+                travelTimeMinutes = travelTimeSeconds / 60;
                 travelTimeMs = travelTimeSeconds * MS_PER_SEC;
                 const measurementDate = parseUtcTimeTag(timeTag);
                 arrivalDate = new Date(measurementDate.getTime() + travelTimeMs);
             }
+            
+            // 7. Geschätzte Sturmbeginn-Zeit (Ankunftszeit + Kritische Aufbauzeit)
+            if (arrivalDate instanceof Date && !isNaN(arrivalDate) && criticalBuildupDuration !== SCI_DURATION_LOW_H) {
+                // Kritische Dauer in Millisekunden umrechnen
+                const durationMs = criticalBuildupDuration * 60 * 60 * 1000;
+                estimatedOnset = new Date(arrivalDate.getTime() + durationMs);
+            }
+
 
             return {
                 ...entry,
                 dynamic_pressure_npa: dynamicPressure,
                 substorm_coupling_index: sci, 
-                sci_risk_level: sciRiskLevel, // NEU: Qualitative Risikostufe
+                sci_risk_level: sciRiskLevel, 
+                critical_buildup_duration_h: criticalBuildupDuration,
+                total_bt: totalBt, // NEU
                 travel_time_h: travelTimeHours,
+                travel_time_m: travelTimeMinutes, // NEU
                 travel_time_ms: travelTimeMs,
                 arrival_time: arrivalDate,
+                estimated_onset_time: estimatedOnset, 
             };
         };
 
-        /**
-         * Gibt die letzten N relevanten Datenpunkte für die KI-Analyse zurück.
-         */
-        const getLatestCriticalData = () => {
-            // Stelle sicher, dass die Daten nach Zeitstempel absteigend sortiert sind (neueste zuerst)
-            const latestData = [...allData].sort((a, b) => 
-                parseUtcTimeTag(b.time_tag).getTime() - parseUtcTimeTag(a.time_tag).getTime()
-            );
-
-            // Nimm die letzten 5 Einträge
-            const criticalData = latestData.slice(0, CRITICAL_DATA_POINTS);
-
-            // Formatiere die Daten als lesbaren String für das LLM
-            // Hinzufügen des SCI zur Kopfzeile
-            const header = "Messzeitpunkt (UTC) | Geschw. (km/s) | Dichte (p/cm³) | Dyn. Druck (nPa) | Bz (nT) | SCI | Risiko | Ankunftszeit (UTC)";
-            const lines = criticalData.map(d => {
-                const arrivalTimeStr = d.arrival_time instanceof Date ? formatTimeOnly(d.arrival_time) : String(d.arrival_time);
-                const pressureStr = typeof d.dynamic_pressure_npa === 'number' ? d.dynamic_pressure_npa.toFixed(2) : String(d.dynamic_pressure_npa);
-                const sciStr = typeof d.substorm_coupling_index === 'number' ? d.substorm_coupling_index.toFixed(0) : String(d.substorm_coupling_index);
-                
-                return `${formatTime(parseUtcTimeTag(d.time_tag))} | ${parseFloat(d.speed).toFixed(1)} | ${parseFloat(d.density).toFixed(2)} | ${pressureStr} | ${parseFloat(d.bz_nt).toFixed(1)} | ${sciStr} | ${d.sci_risk_level} | ${arrivalTimeStr}`;
-            });
-            
-            return {
-                raw: criticalData,
-                text: `${header}\n${'-'.repeat(header.length)}\n${lines.join('\n')}`
-            };
-        };
-
-        // =========================================================================
-        // === Gemini API Implementierung ===
-        // =========================================================================
-
-        /**
-         * Führt einen API-Aufruf mit exponentiellem Backoff durch.
-         */
-        const makeApiCall = async (payload, retries = 0) => {
-            const MAX_RETRIES = 5;
-            try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    if (retries < MAX_RETRIES && response.status === 429) {
-                        const delay = Math.pow(2, retries) * 1000 + Math.random() * 1000;
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        return makeApiCall(payload, retries + 1);
-                    }
-                    throw new Error(`API-Fehler: ${response.status} ${response.statusText}`);
-                }
-
-                const result = await response.json();
-                const candidate = result.candidates?.[0];
-
-                if (!candidate || !candidate.content?.parts?.[0]?.text) {
-                     const blockReason = candidate?.finishReason;
-                    if (blockReason) {
-                        throw new Error(`Die Antwort wurde blockiert. Grund: ${blockReason}`);
-                    }
-                    throw new Error("Unerwartete Antwortstruktur von der API.");
-                }
-
-                const text = candidate.content.parts[0].text;
-                let sources = [];
-                const groundingMetadata = candidate.groundingMetadata;
-
-                if (groundingMetadata && groundingMetadata.groundingAttributions) {
-                    sources = groundingMetadata.groundingAttributions
-                        .map(attribution => ({
-                            uri: attribution.web?.uri,
-                            title: attribution.web?.title,
-                        }))
-                        .filter(source => source.uri && source.title);
-                }
-
-                return { text, sources };
-
-            } catch (error) {
-                throw new Error(`Fehler bei der API-Kommunikation: ${error.message}`);
-            }
-        };
-
-        /**
-         * Setzt den LLM-Ladezustand und steuert die Buttons.
-         */
-        const setLlmLoadingState = (isLoading, buttonId, spinnerId) => {
-            const button = document.getElementById(buttonId);
-            const spinner = document.getElementById(spinnerId);
-
-            summarizeBtn.disabled = isLoading || (buttonId !== 'summarize-btn' && isLoading);
-            alertDraftBtn.disabled = isLoading || (buttonId !== 'alert-draft-btn' && isLoading);
-            impactBtn.disabled = isLoading || (buttonId !== 'impact-btn' && isLoading); // NEU: Impact Button
-
-            if (isLoading) {
-                spinner.classList.remove('hidden');
-                llmError.classList.add('hidden');
-                llmOutput.classList.add('hidden');
-                copyBtn.classList.add('hidden');
-                copyMessage.classList.add('hidden');
-            } else {
-                spinner.classList.add('hidden');
-            }
-        };
-
-
-        /**
-         * Führt die Raumwetter-Zusammenfassung mit Such-Grounding durch.
-         */
-        const summarizeSpaceWeather = async () => {
-            if (allData.length === 0) {
-                displayLlmError("Es sind keine aktuellen Daten für die Analyse vorhanden.");
-                return;
-            }
-            setLlmLoadingState(true, 'summarize-btn', 'summarize-spinner');
-            
-            try {
-                const { text: latestDataText } = getLatestCriticalData();
-                const nowUtc = formatTime(new Date());
-
-                // Prompt aktualisiert, um SCI einzubeziehen
-                const systemPrompt = "Du bist ein erfahrener Weltraumwetter-Analyst. Analysiere die bereitgestellten L1-Solardaten (Geschwindigkeit, Dichte, Dynamischer Druck, Bz-Komponente, Substorm Coupling Index - SCI und das qualitative Risiko) und fasse die aktuelle Weltraumwetterlage in einem maximal dreiparagraphen, leicht verständlichen Bericht zusammen. Gehe auf die folgenden Punkte ein: 1. Geschwindigkeit, Dichte und Dynamischer Druck im Vergleich zum Normalzustand (~400 km/s, ~5 p/cm³, ~1.5 nPa). 2. Die kritische Bz-Komponente (südliche Ausrichtung ist wichtiger als nördliche) und der SCI-Wert/Risiko. 3. Das Potenzial für geomagnetische Störungen (Substürme/Auroras) und die geschätzte Ankunftszeit der neuesten Daten. Verwende Emojis, um die Stimmung der Situation zu vermitteln.";
-                
-                const userQuery = `Analysiere die folgenden neuesten L1-Solardaten (Messzeitpunkt in UTC, aktuell: ${nowUtc}):\n\n${latestDataText}\n\nBitte erstelle eine zusammenfassende Analyse der aktuellen Situation und des Risikopotenzials.`;
-                
-                const payload = {
-                    contents: [{ parts: [{ text: userQuery }] }],
-                    tools: [{ "google_search": {} }],
-                    systemInstruction: { parts: [{ text: systemPrompt }] },
-                };
-
-                const { text, sources } = await makeApiCall(payload);
-                
-                llmTitle.textContent = "Aktuelle Weltraumwetter-Analyse (Gemini)";
-                llmContent.textContent = text;
-                llmSources.innerHTML = sources.length > 0 ? 
-                    'Quellen: ' + sources.map(s => `<a href="${s.uri}" target="_blank" class="text-blue-400 hover:text-blue-300 underline">${s.title}</a>`).join(', ') : 
-                    '';
-                
-                llmOutput.classList.remove('hidden');
-                copyBtn.classList.remove('hidden');
-
-            } catch (error) {
-                displayLlmError(`Fehler bei der Zusammenfassung: ${error.message}`);
-            } finally {
-                setLlmLoadingState(false, 'summarize-btn', 'summarize-spinner');
-            }
-        };
-
-        /**
-         * Entwirft eine Alarmmeldung basierend auf den kritischsten Werten.
-         */
-        const draftAlertMessage = async () => {
-             if (allData.length === 0) {
-                displayLlmError("Es sind keine aktuellen Daten für die Analyse vorhanden.");
-                return;
-            }
-            setLlmLoadingState(true, 'alert-draft-btn', 'alert-spinner');
-            
-            try {
-                const { text: latestDataText, raw: criticalData } = getLatestCriticalData();
-                const latest = criticalData[0] || {};
-                
-                const systemPrompt = "Du bist ein Krisenmanager, der eine kurze, prägnante und aufmerksamkeitsstarke Warnung für Social Media verfasst. Deine Meldung muss auf Deutsch sein, darf maximal 2 Sätze lang sein und sich auf die kritischsten Faktoren (Substorm Coupling Index (SCI), Dynamischer Druck und Bz-Komponente) konzentrieren. Verwende Emojis.";
-                
-                // Query aktualisiert, um SCI und Risiko einzubeziehen
-                const pressure = typeof latest.dynamic_pressure_npa === 'number' ? parseFloat(latest.dynamic_pressure_npa).toFixed(2) : 'N/A';
-                const sci = typeof latest.substorm_coupling_index === 'number' ? parseFloat(latest.substorm_coupling_index).toFixed(0) : 'N/A';
-                const risk = latest.sci_risk_level || 'N/A';
-                
-                const userQuery = `Erstelle eine dringende Alarmmeldung basierend auf den folgenden neuesten Daten:\n\nSubsturm-Risiko: ${risk}\nSubstorm Coupling Index (SCI): ${sci}\nDynamischer Druck: ${pressure} nPa\nBz: ${parseFloat(latest.bz_nt).toFixed(1)} nT\nAnkunftszeit: ${latest.arrival_time instanceof Date ? formatTimeOnly(latest.arrival_time) : 'N/A'}\n\nBitte entwerfe die Alarmmeldung jetzt.`;
-                
-                const payload = {
-                    contents: [{ parts: [{ text: userQuery }] }],
-                    systemInstruction: { parts: [{ text: systemPrompt }] },
-                };
-
-                const { text } = await makeApiCall(payload);
-                
-                llmTitle.textContent = "Entwurf Alarmmeldung";
-                llmContent.textContent = text.trim();
-                llmSources.textContent = 'Keine Quellen benötigt.';
-                llmOutput.classList.remove('hidden');
-                copyBtn.classList.remove('hidden');
-
-            } catch (error) {
-                displayLlmError(`Fehler beim Entwurf der Meldung: ${error.message}`);
-            } finally {
-                setLlmLoadingState(false, 'alert-draft-btn', 'alert-spinner');
-            }
-        };
-
-        /**
-         * NEUE FUNKTION: Bewertet die potenziellen Auswirkungen auf Infrastruktur basierend auf kritischen Werten.
-         */
-        const assessPotentialImpact = async () => {
-            if (allData.length === 0) {
-                displayLlmError("Es sind keine aktuellen Daten für die Analyse vorhanden.");
-                return;
-            }
-            setLlmLoadingState(true, 'impact-btn', 'impact-spinner');
-            
-            try {
-                const { raw: criticalData } = getLatestCriticalData();
-                
-                // Finde den Eintrag mit dem höchsten SCI-Wert (kritischster Zustand)
-                const highestSciEntry = criticalData.reduce((max, entry) => {
-                    const sci = typeof entry.substorm_coupling_index === 'number' ? entry.substorm_coupling_index : -1;
-                    return sci > (max.substorm_coupling_index || -1) ? entry : max;
-                }, {});
-
-                // Daten des kritischsten Punktes extrahieren
-                const sciValue = typeof highestSciEntry.substorm_coupling_index === 'number' ? highestSciEntry.substorm_coupling_index.toFixed(0) : 'N/A';
-                const risk = highestSciEntry.sci_risk_level || 'N/A';
-                const bz = parseFloat(highestSciEntry.bz_nt).toFixed(1);
-                const pressure = typeof highestSciEntry.dynamic_pressure_npa === 'number' ? highestSciEntry.dynamic_pressure_npa.toFixed(2) : 'N/A';
-                const arrival = highestSciEntry.arrival_time instanceof Date ? formatTimeOnly(highestSciEntry.arrival_time) : 'N/A';
-
-                const systemPrompt = `Du bist ein spezialisierter Risikoanalyst für Weltraumwetter und kritische Infrastrukturen. Deine Aufgabe ist es, basierend auf den bereitgestellten Solardaten und externen Informationen (Google Search), eine potenzielle Risikobewertung für Stromnetze, Satelliten und Kommunikationssysteme zu erstellen. Die Antwort muss in drei Abschnitte unterteilt sein: 1. **Risikostufe** (Gesamteinschätzung), 2. **Spezifische Auswirkungen** (pro Infrastrukturtyp), und 3. **Empfohlene Maßnahmen** (z.B. Vorsichtsmaßnahmen). Gib die Antwort ausschließlich in Markdown im folgenden Format aus:\n\n### Risikostufe\n...\n### Spezifische Auswirkungen\n...\n### Empfohlene Maßnahmen\n...`;
-                
-                const userQuery = `Analysiere die folgenden neuesten L1-Solardaten und konzentriere dich dabei auf den kritischsten Zustand (höchster SCI). Der kritischste Eintrag hatte folgende Werte:\n\nSubsturm-Risiko: ${risk}\nSubstorm Coupling Index (SCI): ${sci}\nBz: ${bz} nT\nDyn. Druck: ${pressure} nPa\nGeschätzte Ankunft: ${arrival}\n\nFühre eine Risikobewertung für kritische Infrastrukturen durch.`;
-                
-                const payload = {
-                    contents: [{ parts: [{ text: userQuery }] }],
-                    tools: [{ "google_search": {} }], // Wichtig für geerdete Risikobewertung
-                    systemInstruction: { parts: [{ text: systemPrompt }] },
-                };
-
-                const { text, sources } = await makeApiCall(payload);
-                
-                llmTitle.textContent = `Risikobewertung für kritische Infrastruktur (SCI ${sciValue}, Risiko: ${risk})`;
-                llmContent.textContent = text;
-                llmSources.innerHTML = sources.length > 0 ? 
-                    'Quellen: ' + sources.map(s => `<a href="${s.uri}" target="_blank" class="text-blue-400 hover:text-blue-300 underline">${s.title}</a>`).join(', ') : 
-                    '';
-                
-                llmOutput.classList.remove('hidden');
-                copyBtn.classList.remove('hidden');
-
-            } catch (error) {
-                displayLlmError(`Fehler bei der Risikobewertung: ${error.message}`);
-            } finally {
-                setLlmLoadingState(false, 'impact-btn', 'impact-spinner');
-            }
-        };
-
-
-        /**
-         * Zeigt eine Fehlermeldung für LLM-Aufrufe an.
-         */
-        const displayLlmError = (message) => {
-            llmOutput.classList.add('hidden');
-            llmError.textContent = `Fehler: ${message}`;
-            llmError.classList.remove('hidden');
-        };
 
         // =========================================================================
         // === Tabellen- und UI-Logik ===
@@ -700,6 +409,15 @@
                     compressionIcon = '💥 STAU!'; 
                 }
 
+                // --- Total Bt Hervorhebung ---
+                let btColor = 'text-gray-300';
+                const totalBt = entry.total_bt;
+                if (typeof totalBt === 'number' && totalBt > CRITICAL_BT) {
+                    btColor = 'text-yellow-300 font-bold';
+                } else if (typeof totalBt === 'number' && totalBt < 5.0) {
+                    btColor = 'text-gray-500';
+                }
+
                 // --- SCI (Substorm Coupling Index) und Reihen-Klassifizierung ---
                 const sci = entry.substorm_coupling_index;
                 let sciColor = 'text-gray-300';
@@ -729,25 +447,68 @@
                     ${compressionIcon ? `<span class="mr-1">${compressionIcon}</span>` : ''}${pressureValue}
                 </td>`;
                 
-                row.innerHTML += `<td class="py-3 px-6 text-left">${parseFloat(entry.by_nt).toFixed(1)}</td>`;
+                // Total Bt Zelle (NEU)
+                const totalBtValue = typeof totalBt === 'number' ? totalBt.toFixed(1) : String(totalBt);
+                row.innerHTML += `<td class="py-3 px-6 text-left ${btColor}">${totalBtValue}</td>`;
                 
                 // Bz (nT) - Mit grafischem Pfeil-Indikator
                 row.innerHTML += `<td class="py-3 px-6 text-left ${bzColor}">
                     ${bzIcon ? `<span class="mr-1">${bzIcon}</span>` : ''}${parseFloat(entry.bz_nt).toFixed(1)}
                 </td>`;
 
-                // SCI (Substorm Coupling Index) Zelle
+                // SCI (Substorm Coupling Index) Zelle - ZEIGT DEN WERT AN
                  row.innerHTML += `<td class="py-3 px-6 text-left ${sciColor}">
-                    ${sci > SCI_WATCH_HIGH ? '🚨 ' : ''}${sciValue}
+                    ${sciValue}
                 </td>`;
                 
-                // NEU: Substurm-Risiko Zelle
+                // Kritische Aufbauzeit
+                let durationColor = 'text-gray-400';
+                const duration = entry.critical_buildup_duration_h;
+                let durationText = duration === SCI_DURATION_LOW_H ? '> 3.0 h' : 'N/A';
+
+                if (duration === SCI_DURATION_HIGH_H) {
+                    durationColor = 'text-red-400 font-bold';
+                    durationText = '1.5 - 2.0 h';
+                } else if (duration === SCI_DURATION_ELEVATED_H) {
+                    durationColor = 'text-orange-400';
+                    durationText = '2.0 - 3.0 h';
+                } else if (duration === SCI_DURATION_MEDIUM_H) {
+                    durationColor = 'text-yellow-400';
+                    durationText = 'ca. 3.0 h';
+                }
+                
+                row.innerHTML += `<td class="py-3 px-6 text-left ${durationColor}">${durationText}</td>`;
+                
+                // Geschätzte Sturmbeginn-Zeit
+                let onsetTimeText = 'N/A';
+                let onsetTimeColor = 'text-gray-400';
+                
+                if (entry.estimated_onset_time instanceof Date && !isNaN(entry.estimated_onset_time)) {
+                    // Zeit (HH:MM:SS) aus dem formatierten String extrahieren
+                    onsetTimeText = formatTime(entry.estimated_onset_time).substring(11, 20); 
+                    
+                    const diffMs = entry.estimated_onset_time.getTime() - nowUtc.getTime();
+
+                    if (diffMs > 0 && diffMs <= THIRTY_MINUTES_MS) {
+                        onsetTimeColor = 'text-red-300 font-bold';
+                        onsetTimeText = `⚠️ SOON! ${onsetTimeText}`;
+                    } else if (diffMs <= 0) {
+                        onsetTimeColor = 'text-red-400 font-extrabold';
+                        onsetTimeText = `⚠️ JETZT! ${onsetTimeText}`;
+                    } else {
+                        onsetTimeColor = 'text-blue-300';
+                    }
+                }
+                
+                row.innerHTML += `<td class="py-3 px-6 text-left ${onsetTimeColor}">${onsetTimeText}</td>`;
+
+                // Substurm-Risiko Zelle - ZEIGT DEN LEVEL-STRING AN
                 let riskColor = '';
-                if (entry.sci_risk_level === '🚨 HOCH') {
+                if (entry.sci_risk_level.startsWith('🚨 HOCH')) {
                     riskColor = 'text-red-400 font-bold';
-                } else if (entry.sci_risk_level === '⚠️ Erhöht') {
+                } else if (entry.sci_risk_level.startsWith('⚠️ Erhöht')) {
                     riskColor = 'text-orange-400';
-                } else if (entry.sci_risk_level === 'Mittel') {
+                } else if (entry.sci_risk_level.startsWith('Mittel')) {
                     riskColor = 'text-yellow-400';
                 } else {
                     riskColor = 'text-gray-400';
@@ -777,7 +538,7 @@
                 if (entry.arrival_time instanceof Date && !isNaN(entry.arrival_time)) {
                     const diffMs = entry.arrival_time.getTime() - nowUtc.getTime();
                     
-                    let timeText = formatTimeOnly(entry.arrival_time);
+                    let timeText = entry.arrival_time.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' }) + ' UTC';
                     let cellClass = '';
 
                     // 1. Overtaking Markierung (höchste Priorität für visuelle Aufmerksamkeit)
@@ -810,6 +571,16 @@
                 }
                 arrivalTimeCell += `</td>`;
                 row.innerHTML += arrivalTimeCell;
+                
+                // Laufzeit (Minuten) - NEU
+                let travelTimeMCell = `<td class="py-3 px-6 text-left">`;
+                if (typeof entry.travel_time_m === 'number') {
+                    travelTimeMCell += `${entry.travel_time_m.toFixed(0)} min`;
+                } else {
+                    travelTimeMCell += `N/A`;
+                }
+                travelTimeMCell += `</td>`;
+                row.innerHTML += travelTimeMCell;
 
 
                 // Laufzeit (h)
@@ -836,13 +607,17 @@
                 'speed': d => parseFloat(d.speed) || -Infinity,
                 'density': d => parseFloat(d.density) || -Infinity,
                 'dynamic_pressure_npa': d => typeof d.dynamic_pressure_npa === 'number' ? d.dynamic_pressure_npa : -Infinity,
-                'by_nt': d => parseFloat(d.by_nt) || -Infinity,
+                'total_bt': d => typeof d.total_bt === 'number' ? d.total_bt : -Infinity,
                 'bz_nt': d => parseFloat(d.bz_nt) || -Infinity,
                 'substorm_coupling_index': d => typeof d.substorm_coupling_index === 'number' ? d.substorm_coupling_index : -Infinity,
-                // Neue Spalte nach dem zugrundeliegenden SCI sortieren
+                // Sortiere die kritische Dauer in aufsteigender Reihenfolge (kleinere Dauer ist kritischer)
+                'critical_buildup_duration_h': d => typeof d.critical_buildup_duration_h === 'number' ? d.critical_buildup_duration_h : Infinity, 
+                // Sortiere nach geschätztem Beginn
+                'estimated_onset_time': d => d.estimated_onset_time instanceof Date ? d.estimated_onset_time.getTime() : Infinity,
                 'sci_risk_level': d => typeof d.substorm_coupling_index === 'number' ? d.substorm_coupling_index : -Infinity, 
                 'arrival_time': d => d.travel_time_ms !== null ? parseUtcTimeTag(d.time_tag).getTime() + d.travel_time_ms : -Infinity,
-                'travel_time_h': d => d.travel_time_h !== 'N/A' ? d.travel_time_h : -Infinity
+                'travel_time_h': d => d.travel_time_h !== 'N/A' ? d.travel_time_h : -Infinity,
+                'travel_time_m': d => d.travel_time_m !== 'N/A' ? d.travel_time_m : -Infinity
             };
 
             allData.sort((a, b) => {
@@ -856,13 +631,39 @@
                     comparison = -1;
                 }
 
-                return sortDirection === 'asc' ? comparison : comparison * -1;
+                // Ausnahme: ASC für Kritische Aufbauzeit, Sturmbeginn und Laufzeiten (kürzer ist bald)
+                const isAscendingSort = sortDirection === 'asc' || 
+                                        sortColumn === 'critical_buildup_duration_h' || 
+                                        sortColumn === 'estimated_onset_time' ||
+                                        sortColumn === 'travel_time_h' || 
+                                        sortColumn === 'travel_time_m';
+                
+                // Für Bz und SCI (Risiko) ist DESC die kritischere Richtung (größere Zahl/negative Zahl)
+                if (sortColumn === 'bz_nt') {
+                    // Bz: Größere NEGATIVE Zahl ist kritischer. Daher DESC (negativ zuerst)
+                    return sortDirection === 'asc' ? comparison : comparison * -1;
+                }
+
+
+                return isAscendingSort ? comparison : comparison * -1;
             });
 
             document.querySelectorAll('[data-sort-icon]').forEach(icon => icon.textContent = '');
             const currentIcon = document.querySelector(`[data-sort-icon="${sortColumn}"]`);
             if (currentIcon) {
-                currentIcon.textContent = sortDirection === 'asc' ? '↑' : '↓';
+                // Anzeige der Sortierrichtung
+                if (sortColumn === 'critical_buildup_duration_h' || sortColumn === 'estimated_onset_time' || sortColumn === 'travel_time_h' || sortColumn === 'travel_time_m') {
+                    // Für diese Spalten ist ASC (↑) die "logische" Standardrichtung (bald/kurz zuerst)
+                    currentIcon.textContent = sortDirection === 'asc' ? '↑' : '↓';
+                } else {
+                    // Für alle anderen ist DESC (↓) die Standardrichtung (neueste/höchste zuerst)
+                    currentIcon.textContent = sortDirection === 'asc' ? '↑' : '↓';
+                }
+            }
+            // Standardmäßig nach Zeit absteigend sortieren
+            if (sortColumn === 'time_tag') {
+                const defaultIcon = document.querySelector(`[data-sort-icon="time_tag"]`);
+                defaultIcon.textContent = '↓';
             }
 
             renderTable(allData);
@@ -890,33 +691,47 @@
             plasmaTable.classList.add('hidden');
 
             try {
+                // Exponential Backoff für Fetch-Anfragen (nur zur Simulation, da die Umgebung dies verwaltet)
+                // Bei einem echten Fehler würde ich hier Wiederholungslogik implementieren.
+                
                 const [plasmaDataRaw, magDataRaw] = await Promise.all([
                     fetchData(PLASMA_API_URL),
                     fetchData(MAG_API_URL)
                 ]);
 
+                // Indizes für das Magnetfeld-Array:
+                const MAG_TIME_INDEX = 0;
+                const MAG_BX_INDEX = 1;
                 const MAG_BY_INDEX = 2;
                 const MAG_BZ_INDEX = 3;
+                const MAG_BT_INDEX = 4;
+
                 const magMap = new Map();
                 magDataRaw.forEach(row => {
-                    if (row[MAG_BY_INDEX] !== 'null' && row[MAG_BZ_INDEX] !== 'null') {
-                        magMap.set(row[0], {
+                    const timeTag = row[MAG_TIME_INDEX];
+                    // Überprüfung, ob die kritischen Werte verfügbar sind
+                    if (row[MAG_BX_INDEX] !== 'null' && row[MAG_BY_INDEX] !== 'null' && row[MAG_BZ_INDEX] !== 'null') {
+                        magMap.set(timeTag, {
+                            bx_nt: row[MAG_BX_INDEX],
                             by_nt: row[MAG_BY_INDEX],
-                            bz_nt: row[MAG_BZ_INDEX]
+                            bz_nt: row[MAG_BZ_INDEX],
+                            bt_nt: row[MAG_BT_INDEX] || 'N/A' // Bt ist Index 4, optional
                         });
                     }
                 });
 
                 const processedData = plasmaDataRaw.map(row => {
                     const timeTag = row[0];
-                    const magEntry = magMap.get(timeTag) || { by_nt: 'N/A', bz_nt: 'N/A' };
+                    const magEntry = magMap.get(timeTag) || { bx_nt: 'N/A', by_nt: 'N/A', bz_nt: 'N/A', bt_nt: 'N/A' };
                     
                     const entry = {
                         time_tag: timeTag,
                         density: row[1],
                         speed: row[2],
+                        bx_nt: magEntry.bx_nt, // Hinzugefügt
                         by_nt: magEntry.by_nt,
                         bz_nt: magEntry.bz_nt,
+                        bt_nt: magEntry.bt_nt, // Hinzugefügt
                     };
                     return calculateArrival(entry);
                 });
@@ -971,37 +786,31 @@
                 header.addEventListener('click', (e) => {
                     const key = e.currentTarget.dataset.sortKey;
                     if (sortColumn === key) {
-                        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                        // Bei Sortierung nach Bz wollen wir, dass die negative Zahl (kritisch) zuerst kommt
+                        if (key === 'bz_nt') {
+                            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                        } else {
+                            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                        }
                     } else {
                         sortColumn = key;
-                        sortDirection = 'desc';
+                        
+                        // Standard Sortierung für kritische Werte ist DESC (höchster Wert zuerst)
+                        // Ausnahme: Zeit/Dauer (ASC für kürzer/früher)
+                        if (key === 'critical_buildup_duration_h' || key === 'estimated_onset_time' || key === 'travel_time_h' || key === 'travel_time_m') {
+                            sortDirection = 'asc'; 
+                        } else {
+                            sortDirection = 'desc'; 
+                        }
+
+                         // Bz-Standard-Sortierung: DESC (negativ, d.h. südlich, zuerst)
+                         if (key === 'bz_nt') {
+                            sortDirection = 'asc'; 
+                        }
                     }
                     sortData();
                 });
             });
-
-            // Event-Listener für Gemini-Buttons
-            summarizeBtn.addEventListener('click', summarizeSpaceWeather);
-            alertDraftBtn.addEventListener('click', draftAlertMessage);
-            impactBtn.addEventListener('click', assessPotentialImpact); // Hinzugefügt: Infrastruktur-Analyse
-            
-            // Event-Listener für Kopierfunktion
-            copyBtn.addEventListener('click', () => {
-                const textToCopy = llmContent.textContent;
-                const textarea = document.createElement('textarea');
-                textarea.value = textToCopy;
-                document.body.appendChild(textarea);
-                textarea.select();
-                try {
-                    document.execCommand('copy');
-                    copyMessage.classList.remove('hidden');
-                    setTimeout(() => copyMessage.classList.add('hidden'), 3000);
-                } catch (err) {
-                    console.error('Kopieren fehlgeschlagen:', err);
-                }
-                document.body.removeChild(textarea);
-            });
-
 
             fetchSolarWindData();
             setInterval(fetchSolarWindData, REFRESH_INTERVAL_MS);
