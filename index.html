@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solarwind-Plasma-Daten und Ankunftszeit</title>
+    <title>Solarwind-Plasma-Daten und Substorm-Kopplungsindex</title>
     <!-- Tailwind CSS laden -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -61,6 +61,15 @@
             cursor: not-allowed;
             transform: none;
         }
+        .substorm-watch-high {
+            background-color: #450a0a !important; /* Dunkelrot */
+            border-left: 4px solid #ef4444 !important;
+            font-weight: bold;
+        }
+        .substorm-watch-elevated {
+            background-color: #422006 !important; /* Dunkelorange */
+            border-left: 4px solid #f97316 !important;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -70,7 +79,7 @@
             Solarwind-Plasma-Daten (L1-Punkt)
         </h1>
         <p class="text-lg mb-6 text-gray-400">
-            Daten der NOAA SWPC (Plasma und Magnetfeld) mit berechneter geschätzter Ankunftszeit auf der Erde.
+            Daten der NOAA SWPC (Plasma und Magnetfeld) mit berechneter geschätzter Ankunftszeit und Substurm-Kopplungsindex.
         </p>
 
         <!-- Status- und Ladeanzeige -->
@@ -98,7 +107,7 @@
                             Dichte (p/cm³)
                             <span data-sort-icon="density" class="ml-1"></span>
                         </th>
-                        <!-- NEU: Dynamischer Druck -->
+                        <!-- Dynamischer Druck -->
                         <th class="py-3 px-6 text-left header-cell" data-sort-key="dynamic_pressure_npa">
                             Dyn. Druck (nPa)
                             <span data-sort-icon="dynamic_pressure_npa" class="ml-1"></span>
@@ -111,6 +120,16 @@
                         <th class="py-3 px-6 text-left header-cell" data-sort-key="bz_nt">
                             Bz (nT)
                             <span data-sort-icon="bz_nt" class="ml-1"></span>
+                        </th>
+                        <!-- NEU: Substorm Coupling Index -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="substorm_coupling_index">
+                            ⚡ SCI
+                            <span data-sort-icon="substorm_coupling_index" class="ml-1"></span>
+                        </th>
+                        <!-- NEUE SPALTE: Substurm-Risiko -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="sci_risk_level">
+                            Substurm-Risiko
+                            <span data-sort-icon="sci_risk_level" class="ml-1"></span>
                         </th>
                         <!-- Ankunftszeit -->
                         <th class="py-3 px-6 text-left header-cell" data-sort-key="arrival_time">
@@ -146,6 +165,11 @@
                     <span id="alert-spinner" class="loading-animation llm-loading mr-2 hidden"></span>
                     ✨ Alarmmeldung entwerfen
                 </button>
+                <!-- NEUER BUTTON: Infrastruktur-Auswirkungen bewerten -->
+                <button id="impact-btn" class="llm-btn flex items-center">
+                    <span id="impact-spinner" class="loading-animation llm-loading mr-2 hidden"></span>
+                    ✨ Infrastruktur-Auswirkungen bewerten
+                </button>
             </div>
 
             <!-- Output-Bereich -->
@@ -169,7 +193,8 @@
             <span class="font-bold text-pink-400">🏎️ ÜBERHOLT!</span>: Ein später gemessener Plasmaabschnitt wird **früher** erwartet, was auf eine **Geschwindigkeitsfront** hindeutet.<br>
             <span class="font-bold text-red-400">⬇️ Bz</span>: Zeigt die **Südrichtung** des Magnetfelds an, ein kritischer Indikator für geomagnetische Aktivität und Substürme.<br>
             <span class="font-bold text-yellow-300">💥 STAU! Dyn. Druck</span>: Zeigt eine **starke Kompressionszone (SIR/Stoßwelle)** an (Dichte > $15\text{ p/cm}^3$ und Druck > $5\text{ nPa}$).<br>
-            <span class="font-bold text-red-400">Dyn. Druck (nPa)</span>: Werte **über $10\text{ nPa}$** sind stark erhöht und deuten auf eine erhebliche Magnetosphären-Kompression hin.
+            <span class="font-bold text-red-400">Dyn. Druck (nPa)</span>: Werte **über $10\text{ nPa}$** sind stark erhöht und deuten auf eine erhebliche Magnetosphären-Kompression hin.<br>
+            <span class="font-bold text-red-400">🚨 SCI (Kopplungsindex)</span>: Hohe Werte (**> 3500**) signalisieren ein **hohes Potenzial für Substürme** (starke Polarlichter).
             <br>Hinweis: Die Daten werden vom NOAA Space Weather Prediction Center (SWPC) bereitgestellt und am L1-Punkt gemessen. Die Tabelle wird jede Minute automatisch aktualisiert.
         </p>
     </div>
@@ -197,6 +222,12 @@
         const CRITICAL_PRESSURE_NPA = 10.0; // Schwellenwert für starke Kompression
         const CRITICAL_DENSITY = 15.0; // Schwellenwert für Kompressions-Ereignisse (SIR/Stoßwelle)
 
+        // NEUE KONSTANTEN FÜR SUBSTORM COUPLING INDEX (SCI)
+        // Formel: SCI ≈ Speed * max(0, -Bz) - Vereinfachte Kopplungsfunktion V * Bs
+        const SCI_WATCH_LOW = 1000; 
+        const SCI_WATCH_ELEVATED = 2000; 
+        const SCI_WATCH_HIGH = 3500; 
+
         // --- DOM-Elemente ---
         const tableBody = document.getElementById('table-body');
         const plasmaTable = document.getElementById('plasma-table');
@@ -208,6 +239,11 @@
         const summarizeSpinner = document.getElementById('summarize-spinner');
         const alertDraftBtn = document.getElementById('alert-draft-btn');
         const alertSpinner = document.getElementById('alert-spinner');
+        
+        // NEUE DOM-ELEMENTE FÜR INFRASTRUKTUR-ANALYSE
+        const impactBtn = document.getElementById('impact-btn');
+        const impactSpinner = document.getElementById('impact-spinner');
+
         const llmOutput = document.getElementById('llm-output');
         const llmTitle = document.getElementById('llm-title');
         const llmContent = document.getElementById('llm-content');
@@ -223,6 +259,17 @@
         // =========================================================================
         // === Allgemeine Hilfsfunktionen ===
         // =========================================================================
+        
+        /**
+         * Gibt das qualitative Substurm-Risiko basierend auf dem SCI zurück.
+         */
+        const getSciRiskLevel = (sci) => {
+            if (typeof sci !== 'number' || sci < 0) return 'N/A';
+            if (sci >= SCI_WATCH_HIGH) return '🚨 HOCH';
+            if (sci >= SCI_WATCH_ELEVATED) return '⚠️ Erhöht';
+            if (sci >= SCI_WATCH_LOW) return 'Mittel';
+            return 'Gering';
+        };
 
         /**
          * Konvertiert den NOAA-Zeitstempel-String in ein UTC-Date-Objekt
@@ -262,11 +309,12 @@
 
 
         /**
-         * Führt die Berechnung der geschätzten Ankunftszeit und des Dynamischen Drucks durch
+         * Führt die Berechnung der geschätzten Ankunftszeit, des Dynamischen Drucks und des SCI durch
          */
         const calculateArrival = (entry) => {
             const speed = parseFloat(entry.speed);
             const density = parseFloat(entry.density);
+            const bz = parseFloat(entry.bz_nt);
             const timeTag = entry.time_tag;
 
             // 1. Berechnung des Dynamischen Drucks (nPa)
@@ -275,7 +323,17 @@
                 dynamicPressure = DYNAMIC_PRESSURE_FACTOR * density * (speed * speed);
             }
             
-            // 2. Berechnung der Ankunftszeit (nur wenn Geschwindigkeit gültig)
+            // 2. Berechnung des Substorm Coupling Index (SCI)
+            let sci = 'N/A';
+            if (!isNaN(speed) && speed > 0 && !isNaN(bz)) {
+                // SCI = Speed * max(0, -Bz) -> Nur relevant, wenn Bz südlich (negativ) ist
+                sci = speed * Math.max(0, -bz);
+            }
+
+            // 3. Qualitative Risikobewertung
+            const sciRiskLevel = getSciRiskLevel(sci);
+            
+            // 4. Berechnung der Ankunftszeit (nur wenn Geschwindigkeit gültig)
             let travelTimeHours = 'N/A';
             let travelTimeMs = null;
             let arrivalDate = 'Ungültige Geschw.';
@@ -291,6 +349,8 @@
             return {
                 ...entry,
                 dynamic_pressure_npa: dynamicPressure,
+                substorm_coupling_index: sci, 
+                sci_risk_level: sciRiskLevel, // NEU: Qualitative Risikostufe
                 travel_time_h: travelTimeHours,
                 travel_time_ms: travelTimeMs,
                 arrival_time: arrivalDate,
@@ -310,11 +370,14 @@
             const criticalData = latestData.slice(0, CRITICAL_DATA_POINTS);
 
             // Formatiere die Daten als lesbaren String für das LLM
-            const header = "Messzeitpunkt (UTC) | Geschw. (km/s) | Dichte (p/cm³) | Dyn. Druck (nPa) | Bz (nT) | Ankunftszeit (UTC)";
+            // Hinzufügen des SCI zur Kopfzeile
+            const header = "Messzeitpunkt (UTC) | Geschw. (km/s) | Dichte (p/cm³) | Dyn. Druck (nPa) | Bz (nT) | SCI | Risiko | Ankunftszeit (UTC)";
             const lines = criticalData.map(d => {
                 const arrivalTimeStr = d.arrival_time instanceof Date ? formatTimeOnly(d.arrival_time) : String(d.arrival_time);
                 const pressureStr = typeof d.dynamic_pressure_npa === 'number' ? d.dynamic_pressure_npa.toFixed(2) : String(d.dynamic_pressure_npa);
-                return `${formatTime(parseUtcTimeTag(d.time_tag))} | ${parseFloat(d.speed).toFixed(1)} | ${parseFloat(d.density).toFixed(2)} | ${pressureStr} | ${parseFloat(d.bz_nt).toFixed(1)} | ${arrivalTimeStr}`;
+                const sciStr = typeof d.substorm_coupling_index === 'number' ? d.substorm_coupling_index.toFixed(0) : String(d.substorm_coupling_index);
+                
+                return `${formatTime(parseUtcTimeTag(d.time_tag))} | ${parseFloat(d.speed).toFixed(1)} | ${parseFloat(d.density).toFixed(2)} | ${pressureStr} | ${parseFloat(d.bz_nt).toFixed(1)} | ${sciStr} | ${d.sci_risk_level} | ${arrivalTimeStr}`;
             });
             
             return {
@@ -324,7 +387,7 @@
         };
 
         // =========================================================================
-        // === Gemini API Implementierung === (Unverändert, nur prompt angepasst)
+        // === Gemini API Implementierung ===
         // =========================================================================
 
         /**
@@ -386,9 +449,9 @@
             const button = document.getElementById(buttonId);
             const spinner = document.getElementById(spinnerId);
 
-            button.disabled = isLoading;
-            summarizeBtn.disabled = isLoading || (buttonId === 'summarize-btn' && isLoading);
-            alertDraftBtn.disabled = isLoading || (buttonId === 'alert-draft-btn' && isLoading);
+            summarizeBtn.disabled = isLoading || (buttonId !== 'summarize-btn' && isLoading);
+            alertDraftBtn.disabled = isLoading || (buttonId !== 'alert-draft-btn' && isLoading);
+            impactBtn.disabled = isLoading || (buttonId !== 'impact-btn' && isLoading); // NEU: Impact Button
 
             if (isLoading) {
                 spinner.classList.remove('hidden');
@@ -416,8 +479,8 @@
                 const { text: latestDataText } = getLatestCriticalData();
                 const nowUtc = formatTime(new Date());
 
-                // Prompt aktualisiert, um Dynamischen Druck einzubeziehen
-                const systemPrompt = "Du bist ein erfahrener Weltraumwetter-Analyst. Analysiere die bereitgestellten L1-Solardaten (Geschwindigkeit, Dichte, Dynamischer Druck und Bz-Komponente) und fasse die aktuelle Weltraumwetterlage in einem maximal dreiparagraphen, leicht verständlichen Bericht zusammen. Gehe auf die folgenden Punkte ein: 1. Geschwindigkeit, Dichte und Dynamischer Druck im Vergleich zum Normalzustand (~400 km/s, ~5 p/cm³, ~1.5 nPa). 2. Die kritische Bz-Komponente (südliche Ausrichtung ist wichtiger als nördliche). 3. Das Potenzial für geomagnetische Störungen (Substürme/Auroras) und die geschätzte Ankunftszeit der neuesten Daten. Verwende Emojis, um die Stimmung der Situation zu vermitteln.";
+                // Prompt aktualisiert, um SCI einzubeziehen
+                const systemPrompt = "Du bist ein erfahrener Weltraumwetter-Analyst. Analysiere die bereitgestellten L1-Solardaten (Geschwindigkeit, Dichte, Dynamischer Druck, Bz-Komponente, Substorm Coupling Index - SCI und das qualitative Risiko) und fasse die aktuelle Weltraumwetterlage in einem maximal dreiparagraphen, leicht verständlichen Bericht zusammen. Gehe auf die folgenden Punkte ein: 1. Geschwindigkeit, Dichte und Dynamischer Druck im Vergleich zum Normalzustand (~400 km/s, ~5 p/cm³, ~1.5 nPa). 2. Die kritische Bz-Komponente (südliche Ausrichtung ist wichtiger als nördliche) und der SCI-Wert/Risiko. 3. Das Potenzial für geomagnetische Störungen (Substürme/Auroras) und die geschätzte Ankunftszeit der neuesten Daten. Verwende Emojis, um die Stimmung der Situation zu vermitteln.";
                 
                 const userQuery = `Analysiere die folgenden neuesten L1-Solardaten (Messzeitpunkt in UTC, aktuell: ${nowUtc}):\n\n${latestDataText}\n\nBitte erstelle eine zusammenfassende Analyse der aktuellen Situation und des Risikopotenzials.`;
                 
@@ -436,6 +499,7 @@
                     '';
                 
                 llmOutput.classList.remove('hidden');
+                copyBtn.classList.remove('hidden');
 
             } catch (error) {
                 displayLlmError(`Fehler bei der Zusammenfassung: ${error.message}`);
@@ -458,11 +522,14 @@
                 const { text: latestDataText, raw: criticalData } = getLatestCriticalData();
                 const latest = criticalData[0] || {};
                 
-                const systemPrompt = "Du bist ein Krisenmanager, der eine kurze, prägnante und aufmerksamkeitsstarke Warnung für Social Media verfasst. Deine Meldung muss auf Deutsch sein, darf maximal 2 Sätze lang sein und sich auf die kritischsten Faktoren (Dynamischer Druck und Bz-Komponente) konzentrieren. Verwende Emojis.";
+                const systemPrompt = "Du bist ein Krisenmanager, der eine kurze, prägnante und aufmerksamkeitsstarke Warnung für Social Media verfasst. Deine Meldung muss auf Deutsch sein, darf maximal 2 Sätze lang sein und sich auf die kritischsten Faktoren (Substorm Coupling Index (SCI), Dynamischer Druck und Bz-Komponente) konzentrieren. Verwende Emojis.";
                 
-                // Query aktualisiert, um Dynamischen Druck einzubeziehen
+                // Query aktualisiert, um SCI und Risiko einzubeziehen
                 const pressure = typeof latest.dynamic_pressure_npa === 'number' ? parseFloat(latest.dynamic_pressure_npa).toFixed(2) : 'N/A';
-                const userQuery = `Erstelle eine dringende Alarmmeldung basierend auf den folgenden neuesten Daten:\n\nDynamischer Druck: ${pressure} nPa\nBz: ${parseFloat(latest.bz_nt).toFixed(1)} nT\nAnkunftszeit: ${latest.arrival_time instanceof Date ? formatTimeOnly(latest.arrival_time) : 'N/A'}\n\nBitte entwerfe die Alarmmeldung jetzt.`;
+                const sci = typeof latest.substorm_coupling_index === 'number' ? parseFloat(latest.substorm_coupling_index).toFixed(0) : 'N/A';
+                const risk = latest.sci_risk_level || 'N/A';
+                
+                const userQuery = `Erstelle eine dringende Alarmmeldung basierend auf den folgenden neuesten Daten:\n\nSubsturm-Risiko: ${risk}\nSubstorm Coupling Index (SCI): ${sci}\nDynamischer Druck: ${pressure} nPa\nBz: ${parseFloat(latest.bz_nt).toFixed(1)} nT\nAnkunftszeit: ${latest.arrival_time instanceof Date ? formatTimeOnly(latest.arrival_time) : 'N/A'}\n\nBitte entwerfe die Alarmmeldung jetzt.`;
                 
                 const payload = {
                     contents: [{ parts: [{ text: userQuery }] }],
@@ -483,6 +550,61 @@
                 setLlmLoadingState(false, 'alert-draft-btn', 'alert-spinner');
             }
         };
+
+        /**
+         * NEUE FUNKTION: Bewertet die potenziellen Auswirkungen auf Infrastruktur basierend auf kritischen Werten.
+         */
+        const assessPotentialImpact = async () => {
+            if (allData.length === 0) {
+                displayLlmError("Es sind keine aktuellen Daten für die Analyse vorhanden.");
+                return;
+            }
+            setLlmLoadingState(true, 'impact-btn', 'impact-spinner');
+            
+            try {
+                const { raw: criticalData } = getLatestCriticalData();
+                
+                // Finde den Eintrag mit dem höchsten SCI-Wert (kritischster Zustand)
+                const highestSciEntry = criticalData.reduce((max, entry) => {
+                    const sci = typeof entry.substorm_coupling_index === 'number' ? entry.substorm_coupling_index : -1;
+                    return sci > (max.substorm_coupling_index || -1) ? entry : max;
+                }, {});
+
+                // Daten des kritischsten Punktes extrahieren
+                const sciValue = typeof highestSciEntry.substorm_coupling_index === 'number' ? highestSciEntry.substorm_coupling_index.toFixed(0) : 'N/A';
+                const risk = highestSciEntry.sci_risk_level || 'N/A';
+                const bz = parseFloat(highestSciEntry.bz_nt).toFixed(1);
+                const pressure = typeof highestSciEntry.dynamic_pressure_npa === 'number' ? highestSciEntry.dynamic_pressure_npa.toFixed(2) : 'N/A';
+                const arrival = highestSciEntry.arrival_time instanceof Date ? formatTimeOnly(highestSciEntry.arrival_time) : 'N/A';
+
+                const systemPrompt = `Du bist ein spezialisierter Risikoanalyst für Weltraumwetter und kritische Infrastrukturen. Deine Aufgabe ist es, basierend auf den bereitgestellten Solardaten und externen Informationen (Google Search), eine potenzielle Risikobewertung für Stromnetze, Satelliten und Kommunikationssysteme zu erstellen. Die Antwort muss in drei Abschnitte unterteilt sein: 1. **Risikostufe** (Gesamteinschätzung), 2. **Spezifische Auswirkungen** (pro Infrastrukturtyp), und 3. **Empfohlene Maßnahmen** (z.B. Vorsichtsmaßnahmen). Gib die Antwort ausschließlich in Markdown im folgenden Format aus:\n\n### Risikostufe\n...\n### Spezifische Auswirkungen\n...\n### Empfohlene Maßnahmen\n...`;
+                
+                const userQuery = `Analysiere die folgenden neuesten L1-Solardaten und konzentriere dich dabei auf den kritischsten Zustand (höchster SCI). Der kritischste Eintrag hatte folgende Werte:\n\nSubsturm-Risiko: ${risk}\nSubstorm Coupling Index (SCI): ${sci}\nBz: ${bz} nT\nDyn. Druck: ${pressure} nPa\nGeschätzte Ankunft: ${arrival}\n\nFühre eine Risikobewertung für kritische Infrastrukturen durch.`;
+                
+                const payload = {
+                    contents: [{ parts: [{ text: userQuery }] }],
+                    tools: [{ "google_search": {} }], // Wichtig für geerdete Risikobewertung
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                };
+
+                const { text, sources } = await makeApiCall(payload);
+                
+                llmTitle.textContent = `Risikobewertung für kritische Infrastruktur (SCI ${sciValue}, Risiko: ${risk})`;
+                llmContent.textContent = text;
+                llmSources.innerHTML = sources.length > 0 ? 
+                    'Quellen: ' + sources.map(s => `<a href="${s.uri}" target="_blank" class="text-blue-400 hover:text-blue-300 underline">${s.title}</a>`).join(', ') : 
+                    '';
+                
+                llmOutput.classList.remove('hidden');
+                copyBtn.classList.remove('hidden');
+
+            } catch (error) {
+                displayLlmError(`Fehler bei der Risikobewertung: ${error.message}`);
+            } finally {
+                setLlmLoadingState(false, 'impact-btn', 'impact-spinner');
+            }
+        };
+
 
         /**
          * Zeigt eine Fehlermeldung für LLM-Aufrufe an.
@@ -521,11 +643,11 @@
                     }
                 }
 
-                const isOdd = index % 2 !== 0;
-                const highlightClass = isArrived ? 'highlight-row' : '';
-                
+                let rowClass = index % 2 !== 0 ? 'bg-gray-700/50' : '';
+                rowClass += isArrived ? ' highlight-row' : '';
+
                 const row = document.createElement('tr');
-                row.className = `border-b border-gray-700 hover:bg-gray-700 transition duration-150 ${isOdd ? 'bg-gray-700/50' : ''} ${highlightClass}`;
+                row.className = `border-b border-gray-700 hover:bg-gray-700 transition duration-150 ${rowClass}`;
 
                 // --- Bz (Magnetfeld) Verbesserungen ---
                 let bzColor = 'text-gray-300';
@@ -577,6 +699,25 @@
                     pressureColor = 'text-yellow-300 font-extrabold'; 
                     compressionIcon = '💥 STAU!'; 
                 }
+
+                // --- SCI (Substorm Coupling Index) und Reihen-Klassifizierung ---
+                const sci = entry.substorm_coupling_index;
+                let sciColor = 'text-gray-300';
+                
+                if (typeof sci === 'number') {
+                    if (sci > SCI_WATCH_HIGH) {
+                        sciColor = 'text-red-400 font-extrabold';
+                        // Höchste Warnstufe: Hintergrund hervorheben
+                        row.classList.add('substorm-watch-high'); 
+                    } else if (sci > SCI_WATCH_ELEVATED) {
+                        sciColor = 'text-orange-400 font-bold';
+                        row.classList.add('substorm-watch-elevated');
+                    } else if (sci > SCI_WATCH_LOW) {
+                        sciColor = 'text-yellow-400';
+                    }
+                }
+                
+                const sciValue = typeof sci === 'number' ? sci.toFixed(0) : String(sci);
                 
                 row.innerHTML += `<td class="py-3 px-6 text-left">${formatTime(parseUtcTimeTag(entry.time_tag))}</td>`;
                 row.innerHTML += `<td class="py-3 px-6 text-left ${speedColor}">${parseFloat(entry.speed).toFixed(1)}</td>`;
@@ -593,6 +734,27 @@
                 // Bz (nT) - Mit grafischem Pfeil-Indikator
                 row.innerHTML += `<td class="py-3 px-6 text-left ${bzColor}">
                     ${bzIcon ? `<span class="mr-1">${bzIcon}</span>` : ''}${parseFloat(entry.bz_nt).toFixed(1)}
+                </td>`;
+
+                // SCI (Substorm Coupling Index) Zelle
+                 row.innerHTML += `<td class="py-3 px-6 text-left ${sciColor}">
+                    ${sci > SCI_WATCH_HIGH ? '🚨 ' : ''}${sciValue}
+                </td>`;
+                
+                // NEU: Substurm-Risiko Zelle
+                let riskColor = '';
+                if (entry.sci_risk_level === '🚨 HOCH') {
+                    riskColor = 'text-red-400 font-bold';
+                } else if (entry.sci_risk_level === '⚠️ Erhöht') {
+                    riskColor = 'text-orange-400';
+                } else if (entry.sci_risk_level === 'Mittel') {
+                    riskColor = 'text-yellow-400';
+                } else {
+                    riskColor = 'text-gray-400';
+                }
+
+                row.innerHTML += `<td class="py-3 px-6 text-left ${riskColor}">
+                    ${entry.sci_risk_level}
                 </td>`;
 
 
@@ -676,6 +838,9 @@
                 'dynamic_pressure_npa': d => typeof d.dynamic_pressure_npa === 'number' ? d.dynamic_pressure_npa : -Infinity,
                 'by_nt': d => parseFloat(d.by_nt) || -Infinity,
                 'bz_nt': d => parseFloat(d.bz_nt) || -Infinity,
+                'substorm_coupling_index': d => typeof d.substorm_coupling_index === 'number' ? d.substorm_coupling_index : -Infinity,
+                // Neue Spalte nach dem zugrundeliegenden SCI sortieren
+                'sci_risk_level': d => typeof d.substorm_coupling_index === 'number' ? d.substorm_coupling_index : -Infinity, 
                 'arrival_time': d => d.travel_time_ms !== null ? parseUtcTimeTag(d.time_tag).getTime() + d.travel_time_ms : -Infinity,
                 'travel_time_h': d => d.travel_time_h !== 'N/A' ? d.travel_time_h : -Infinity
             };
@@ -818,6 +983,7 @@
             // Event-Listener für Gemini-Buttons
             summarizeBtn.addEventListener('click', summarizeSpaceWeather);
             alertDraftBtn.addEventListener('click', draftAlertMessage);
+            impactBtn.addEventListener('click', assessPotentialImpact); // Hinzugefügt: Infrastruktur-Analyse
             
             // Event-Listener für Kopierfunktion
             copyBtn.addEventListener('click', () => {
