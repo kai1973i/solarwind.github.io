@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solarwind-Plasma-Daten und Ankunftszeit</title>
+    <!-- Tailwind CSS laden -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Spezifische Schriftart */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117; /* Dunkler Hintergrund */
+            color: #c9d1d9; /* Heller Text */
+        }
+        .header-cell {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .header-cell:hover {
+            background-color: #21262d;
+        }
+        .loading-animation {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #58a6ff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* HIGHTLIGHT-KLASSE: Markiert Daten, deren Ankunft theoretisch bereits erfolgt ist (dezente Hervorhebung) */
+        .highlight-row {
+            background-color: #1a222e; /* Dunkler, dezenter Blauton */
+            border-left: 4px solid #3b82f6; /* Subtiler blauer Rand (passend zur Header-Farbe) */
+        }
+        .highlight-row:hover {
+            background-color: #242c38 !important; /* Etwas heller beim Hover */
+        }
+        .llm-loading {
+            width: 1rem;
+            height: 1rem;
+        }
+        .llm-btn {
+            background-color: #4f46e5;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .llm-btn:hover {
+            background-color: #4338ca;
+            transform: translateY(-1px);
+        }
+        .llm-btn:disabled {
+            background-color: #312e81;
+            cursor: not-allowed;
+            transform: none;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl md:text-4xl font-extrabold mb-2 text-blue-400">
+            Solarwind-Plasma-Daten (L1-Punkt)
+        </h1>
+        <p class="text-lg mb-6 text-gray-400">
+            Daten der NOAA SWPC (Plasma und Magnetfeld) mit berechneter geschätzter Ankunftszeit auf der Erde.
+        </p>
+
+        <!-- Status- und Ladeanzeige -->
+        <div id="status-message" class="text-center p-4 my-4 bg-gray-800 rounded-lg shadow-lg hidden"></div>
+        <div id="loading-indicator" class="flex justify-center items-center p-8">
+            <div class="loading-animation"></div>
+            <span class="ml-4 text-xl text-blue-400">Daten werden geladen...</span>
+        </div>
+
+        <!-- Tabelle für die Daten -->
+        <div id="data-container" class="overflow-x-auto">
+            <table id="plasma-table" class="min-w-full bg-gray-800 rounded-lg shadow-2xl hidden">
+                <thead>
+                    <tr class="bg-blue-600/80 text-white uppercase text-sm leading-normal">
+                        <!-- Plasmadaten & Zeiten -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="time_tag">
+                            Messzeitpunkt (L1)
+                            <span data-sort-icon="time_tag" class="ml-1">↓</span>
+                        </th>
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="speed">
+                            Geschw. (km/s)
+                            <span data-sort-icon="speed" class="ml-1"></span>
+                        </th>
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="density">
+                            Dichte (p/cm³)
+                            <span data-sort-icon="density" class="ml-1"></span>
+                        </th>
+                        <!-- NEU: Dynamischer Druck -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="dynamic_pressure_npa">
+                            Dyn. Druck (nPa)
+                            <span data-sort-icon="dynamic_pressure_npa" class="ml-1"></span>
+                        </th>
+                        <!-- Magnetfelddaten -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="by_nt">
+                            By (nT)
+                            <span data-sort-icon="by_nt" class="ml-1"></span>
+                        </th>
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="bz_nt">
+                            Bz (nT)
+                            <span data-sort-icon="bz_nt" class="ml-1"></span>
+                        </th>
+                        <!-- Ankunftszeit -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="arrival_time">
+                            Gesch. Ankunftszeit (Erde)
+                            <span data-sort-icon="arrival_time" class="ml-1"></span>
+                        </th>
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="travel_time_h">
+                            Laufzeit (h)
+                            <span data-sort-icon="travel_time_h" class="ml-1"></span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="table-body" class="text-gray-300 text-sm font-light">
+                    <!-- Daten werden hier durch JavaScript eingefügt -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Gemini LLM Analyse Sektion -->
+        <div class="mt-10 p-6 bg-gray-800 rounded-lg shadow-xl border border-blue-700/50">
+            <h2 class="text-2xl font-bold mb-4 text-blue-300">
+                ✨ Gemini KI-Analyse & Meldung
+            </h2>
+            <p class="text-gray-400 mb-4">
+                Nutze die KI, um die letzten Solardaten zu interpretieren und eine Meldung zu entwerfen.
+            </p>
+            <div class="flex flex-wrap gap-4 mb-6">
+                <button id="summarize-btn" class="llm-btn flex items-center">
+                    <span id="summarize-spinner" class="loading-animation llm-loading mr-2 hidden"></span>
+                    ✨ Raumwetter zusammenfassen
+                </button>
+                <button id="alert-draft-btn" class="llm-btn flex items-center">
+                    <span id="alert-spinner" class="loading-animation llm-loading mr-2 hidden"></span>
+                    ✨ Alarmmeldung entwerfen
+                </button>
+            </div>
+
+            <!-- Output-Bereich -->
+            <div id="llm-output" class="mt-4 p-4 bg-gray-900 border border-gray-700 rounded-lg hidden">
+                <h3 class="text-xl font-semibold mb-2 text-white" id="llm-title"></h3>
+                <div id="llm-content" class="text-gray-300 whitespace-pre-wrap"></div>
+                <div id="llm-sources" class="mt-4 text-xs text-gray-500"></div>
+                <button id="copy-btn" class="llm-btn mt-4 py-2 px-4 text-sm hidden">
+                    In Zwischenablage kopieren
+                </button>
+                <div id="copy-message" class="text-green-400 text-sm mt-2 hidden">Kopiert!</div>
+            </div>
+            <!-- Fehlermeldungen für LLM-Aufrufe -->
+            <div id="llm-error" class="mt-4 p-4 bg-red-900/50 text-red-300 border border-red-700 rounded-lg hidden"></div>
+        </div>
+        <!-- Ende Gemini LLM Analyse Sektion -->
+
+        <p class="mt-6 text-xs text-gray-500">
+            <span class="font-bold text-blue-400">Hervorgehobene Zeilen</span> (blaue Markierung) sind bereits auf der Erde **angekommen**.<br>
+            <span class="font-bold text-blue-300">🔜</span> in der Ankunftszeit: Der Solarwind wird **innerhalb der nächsten 30 Minuten** erwartet.<br>
+            <span class="font-bold text-pink-400">🏎️ ÜBERHOLT!</span>: Ein später gemessener Plasmaabschnitt wird **früher** erwartet, was auf eine **Geschwindigkeitsfront** hindeutet.<br>
+            <span class="font-bold text-red-400">⬇️ Bz</span>: Zeigt die **Südrichtung** des Magnetfelds an, ein kritischer Indikator für geomagnetische Aktivität und Substürme.<br>
+            <span class="font-bold text-yellow-300">💥 STAU! Dyn. Druck</span>: Zeigt eine **starke Kompressionszone (SIR/Stoßwelle)** an (Dichte > $15\text{ p/cm}^3$ und Druck > $5\text{ nPa}$).<br>
+            <span class="font-bold text-red-400">Dyn. Druck (nPa)</span>: Werte **über $10\text{ nPa}$** sind stark erhöht und deuten auf eine erhebliche Magnetosphären-Kompression hin.
+            <br>Hinweis: Die Daten werden vom NOAA Space Weather Prediction Center (SWPC) bereitgestellt und am L1-Punkt gemessen. Die Tabelle wird jede Minute automatisch aktualisiert.
+        </p>
+    </div>
+
+    <script type="module">
+        // --- Globale Firebase/App-Konstanten (werden vom Canvas bereitgestellt) ---
+        const apiKey = "" // API-Schlüssel für Gemini
+        const GEMINI_MODEL = 'gemini-2.5-flash-preview-05-20';
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+        
+        // --- Anwendungskonstanten ---
+        const PLASMA_API_URL = 'https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json';
+        const MAG_API_URL = 'https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json';
+        
+        const L1_DISTANCE_KM = 1500000;
+        const MS_PER_SEC = 1000;
+        const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+        const THIRTY_MINUTES_MS = 30 * 60 * 1000;
+        const REFRESH_INTERVAL_MS = 60 * 1000;
+        const CRITICAL_DATA_POINTS = 5; // Anzahl der neuesten Datenpunkte für die KI-Analyse
+        
+        // Konstante für die Berechnung des Dynamischen Drucks in nPa
+        // Formel: P_dyn (nPa) ≈ 1.672 * 10^-6 * Density (p/cm³) * Speed (km/s)^2
+        const DYNAMIC_PRESSURE_FACTOR = 0.001672;
+        const CRITICAL_PRESSURE_NPA = 10.0; // Schwellenwert für starke Kompression
+        const CRITICAL_DENSITY = 15.0; // Schwellenwert für Kompressions-Ereignisse (SIR/Stoßwelle)
+
+        // --- DOM-Elemente ---
+        const tableBody = document.getElementById('table-body');
+        const plasmaTable = document.getElementById('plasma-table');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const statusMessage = document.getElementById('status-message');
+        const headers = document.querySelectorAll('.header-cell');
+
+        const summarizeBtn = document.getElementById('summarize-btn');
+        const summarizeSpinner = document.getElementById('summarize-spinner');
+        const alertDraftBtn = document.getElementById('alert-draft-btn');
+        const alertSpinner = document.getElementById('alert-spinner');
+        const llmOutput = document.getElementById('llm-output');
+        const llmTitle = document.getElementById('llm-title');
+        const llmContent = document.getElementById('llm-content');
+        const llmSources = document.getElementById('llm-sources');
+        const llmError = document.getElementById('llm-error');
+        const copyBtn = document.getElementById('copy-btn');
+        const copyMessage = document.getElementById('copy-message');
+
+        let allData = [];
+        let sortColumn = 'time_tag';
+        let sortDirection = 'desc';
+
+        // =========================================================================
+        // === Allgemeine Hilfsfunktionen ===
+        // =========================================================================
+
+        /**
+         * Konvertiert den NOAA-Zeitstempel-String in ein UTC-Date-Objekt
+         */
+        const parseUtcTimeTag = (timeTag) => {
+            return new Date(timeTag.replace(' ', 'T') + 'Z');
+        };
+
+        /**
+         * Formatiert Zeitstempel mit Datum und Uhrzeit
+         */
+        const formatTime = (date) => {
+            if (!(date instanceof Date) || isNaN(date)) return 'N/A';
+            const options = {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false,
+                timeZone: 'UTC'
+            };
+            return date.toLocaleString('de-DE', options) + ' UTC';
+        };
+
+        /**
+         * Formatiert Zeitstempel nur mit Uhrzeit
+         */
+        const formatTimeOnly = (date) => {
+            if (!(date instanceof Date) || isNaN(date)) return 'N/A';
+            const options = {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+                timeZone: 'UTC'
+            };
+            return date.toLocaleString('de-DE', options) + ' UTC';
+        };
+
+
+        /**
+         * Führt die Berechnung der geschätzten Ankunftszeit und des Dynamischen Drucks durch
+         */
+        const calculateArrival = (entry) => {
+            const speed = parseFloat(entry.speed);
+            const density = parseFloat(entry.density);
+            const timeTag = entry.time_tag;
+
+            // 1. Berechnung des Dynamischen Drucks (nPa)
+            let dynamicPressure = 'N/A';
+            if (!isNaN(speed) && speed > 0 && !isNaN(density) && density >= 0) {
+                dynamicPressure = DYNAMIC_PRESSURE_FACTOR * density * (speed * speed);
+            }
+            
+            // 2. Berechnung der Ankunftszeit (nur wenn Geschwindigkeit gültig)
+            let travelTimeHours = 'N/A';
+            let travelTimeMs = null;
+            let arrivalDate = 'Ungültige Geschw.';
+
+            if (!isNaN(speed) && speed > 0 && speed <= 10000) {
+                const travelTimeSeconds = L1_DISTANCE_KM / speed;
+                travelTimeHours = travelTimeSeconds / 3600;
+                travelTimeMs = travelTimeSeconds * MS_PER_SEC;
+                const measurementDate = parseUtcTimeTag(timeTag);
+                arrivalDate = new Date(measurementDate.getTime() + travelTimeMs);
+            }
+
+            return {
+                ...entry,
+                dynamic_pressure_npa: dynamicPressure,
+                travel_time_h: travelTimeHours,
+                travel_time_ms: travelTimeMs,
+                arrival_time: arrivalDate,
+            };
+        };
+
+        /**
+         * Gibt die letzten N relevanten Datenpunkte für die KI-Analyse zurück.
+         */
+        const getLatestCriticalData = () => {
+            // Stelle sicher, dass die Daten nach Zeitstempel absteigend sortiert sind (neueste zuerst)
+            const latestData = [...allData].sort((a, b) => 
+                parseUtcTimeTag(b.time_tag).getTime() - parseUtcTimeTag(a.time_tag).getTime()
+            );
+
+            // Nimm die letzten 5 Einträge
+            const criticalData = latestData.slice(0, CRITICAL_DATA_POINTS);
+
+            // Formatiere die Daten als lesbaren String für das LLM
+            const header = "Messzeitpunkt (UTC) | Geschw. (km/s) | Dichte (p/cm³) | Dyn. Druck (nPa) | Bz (nT) | Ankunftszeit (UTC)";
+            const lines = criticalData.map(d => {
+                const arrivalTimeStr = d.arrival_time instanceof Date ? formatTimeOnly(d.arrival_time) : String(d.arrival_time);
+                const pressureStr = typeof d.dynamic_pressure_npa === 'number' ? d.dynamic_pressure_npa.toFixed(2) : String(d.dynamic_pressure_npa);
+                return `${formatTime(parseUtcTimeTag(d.time_tag))} | ${parseFloat(d.speed).toFixed(1)} | ${parseFloat(d.density).toFixed(2)} | ${pressureStr} | ${parseFloat(d.bz_nt).toFixed(1)} | ${arrivalTimeStr}`;
+            });
+            
+            return {
+                raw: criticalData,
+                text: `${header}\n${'-'.repeat(header.length)}\n${lines.join('\n')}`
+            };
+        };
+
+        // =========================================================================
+        // === Gemini API Implementierung === (Unverändert, nur prompt angepasst)
+        // =========================================================================
+
+        /**
+         * Führt einen API-Aufruf mit exponentiellem Backoff durch.
+         */
+        const makeApiCall = async (payload, retries = 0) => {
+            const MAX_RETRIES = 5;
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    if (retries < MAX_RETRIES && response.status === 429) {
+                        const delay = Math.pow(2, retries) * 1000 + Math.random() * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        return makeApiCall(payload, retries + 1);
+                    }
+                    throw new Error(`API-Fehler: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+
+                if (!candidate || !candidate.content?.parts?.[0]?.text) {
+                     const blockReason = candidate?.finishReason;
+                    if (blockReason) {
+                        throw new Error(`Die Antwort wurde blockiert. Grund: ${blockReason}`);
+                    }
+                    throw new Error("Unerwartete Antwortstruktur von der API.");
+                }
+
+                const text = candidate.content.parts[0].text;
+                let sources = [];
+                const groundingMetadata = candidate.groundingMetadata;
+
+                if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                    sources = groundingMetadata.groundingAttributions
+                        .map(attribution => ({
+                            uri: attribution.web?.uri,
+                            title: attribution.web?.title,
+                        }))
+                        .filter(source => source.uri && source.title);
+                }
+
+                return { text, sources };
+
+            } catch (error) {
+                throw new Error(`Fehler bei der API-Kommunikation: ${error.message}`);
+            }
+        };
+
+        /**
+         * Setzt den LLM-Ladezustand und steuert die Buttons.
+         */
+        const setLlmLoadingState = (isLoading, buttonId, spinnerId) => {
+            const button = document.getElementById(buttonId);
+            const spinner = document.getElementById(spinnerId);
+
+            button.disabled = isLoading;
+            summarizeBtn.disabled = isLoading || (buttonId === 'summarize-btn' && isLoading);
+            alertDraftBtn.disabled = isLoading || (buttonId === 'alert-draft-btn' && isLoading);
+
+            if (isLoading) {
+                spinner.classList.remove('hidden');
+                llmError.classList.add('hidden');
+                llmOutput.classList.add('hidden');
+                copyBtn.classList.add('hidden');
+                copyMessage.classList.add('hidden');
+            } else {
+                spinner.classList.add('hidden');
+            }
+        };
+
+
+        /**
+         * Führt die Raumwetter-Zusammenfassung mit Such-Grounding durch.
+         */
+        const summarizeSpaceWeather = async () => {
+            if (allData.length === 0) {
+                displayLlmError("Es sind keine aktuellen Daten für die Analyse vorhanden.");
+                return;
+            }
+            setLlmLoadingState(true, 'summarize-btn', 'summarize-spinner');
+            
+            try {
+                const { text: latestDataText } = getLatestCriticalData();
+                const nowUtc = formatTime(new Date());
+
+                // Prompt aktualisiert, um Dynamischen Druck einzubeziehen
+                const systemPrompt = "Du bist ein erfahrener Weltraumwetter-Analyst. Analysiere die bereitgestellten L1-Solardaten (Geschwindigkeit, Dichte, Dynamischer Druck und Bz-Komponente) und fasse die aktuelle Weltraumwetterlage in einem maximal dreiparagraphen, leicht verständlichen Bericht zusammen. Gehe auf die folgenden Punkte ein: 1. Geschwindigkeit, Dichte und Dynamischer Druck im Vergleich zum Normalzustand (~400 km/s, ~5 p/cm³, ~1.5 nPa). 2. Die kritische Bz-Komponente (südliche Ausrichtung ist wichtiger als nördliche). 3. Das Potenzial für geomagnetische Störungen (Substürme/Auroras) und die geschätzte Ankunftszeit der neuesten Daten. Verwende Emojis, um die Stimmung der Situation zu vermitteln.";
+                
+                const userQuery = `Analysiere die folgenden neuesten L1-Solardaten (Messzeitpunkt in UTC, aktuell: ${nowUtc}):\n\n${latestDataText}\n\nBitte erstelle eine zusammenfassende Analyse der aktuellen Situation und des Risikopotenzials.`;
+                
+                const payload = {
+                    contents: [{ parts: [{ text: userQuery }] }],
+                    tools: [{ "google_search": {} }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                };
+
+                const { text, sources } = await makeApiCall(payload);
+                
+                llmTitle.textContent = "Aktuelle Weltraumwetter-Analyse (Gemini)";
+                llmContent.textContent = text;
+                llmSources.innerHTML = sources.length > 0 ? 
+                    'Quellen: ' + sources.map(s => `<a href="${s.uri}" target="_blank" class="text-blue-400 hover:text-blue-300 underline">${s.title}</a>`).join(', ') : 
+                    '';
+                
+                llmOutput.classList.remove('hidden');
+
+            } catch (error) {
+                displayLlmError(`Fehler bei der Zusammenfassung: ${error.message}`);
+            } finally {
+                setLlmLoadingState(false, 'summarize-btn', 'summarize-spinner');
+            }
+        };
+
+        /**
+         * Entwirft eine Alarmmeldung basierend auf den kritischsten Werten.
+         */
+        const draftAlertMessage = async () => {
+             if (allData.length === 0) {
+                displayLlmError("Es sind keine aktuellen Daten für die Analyse vorhanden.");
+                return;
+            }
+            setLlmLoadingState(true, 'alert-draft-btn', 'alert-spinner');
+            
+            try {
+                const { text: latestDataText, raw: criticalData } = getLatestCriticalData();
+                const latest = criticalData[0] || {};
+                
+                const systemPrompt = "Du bist ein Krisenmanager, der eine kurze, prägnante und aufmerksamkeitsstarke Warnung für Social Media verfasst. Deine Meldung muss auf Deutsch sein, darf maximal 2 Sätze lang sein und sich auf die kritischsten Faktoren (Dynamischer Druck und Bz-Komponente) konzentrieren. Verwende Emojis.";
+                
+                // Query aktualisiert, um Dynamischen Druck einzubeziehen
+                const pressure = typeof latest.dynamic_pressure_npa === 'number' ? parseFloat(latest.dynamic_pressure_npa).toFixed(2) : 'N/A';
+                const userQuery = `Erstelle eine dringende Alarmmeldung basierend auf den folgenden neuesten Daten:\n\nDynamischer Druck: ${pressure} nPa\nBz: ${parseFloat(latest.bz_nt).toFixed(1)} nT\nAnkunftszeit: ${latest.arrival_time instanceof Date ? formatTimeOnly(latest.arrival_time) : 'N/A'}\n\nBitte entwerfe die Alarmmeldung jetzt.`;
+                
+                const payload = {
+                    contents: [{ parts: [{ text: userQuery }] }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                };
+
+                const { text } = await makeApiCall(payload);
+                
+                llmTitle.textContent = "Entwurf Alarmmeldung";
+                llmContent.textContent = text.trim();
+                llmSources.textContent = 'Keine Quellen benötigt.';
+                llmOutput.classList.remove('hidden');
+                copyBtn.classList.remove('hidden');
+
+            } catch (error) {
+                displayLlmError(`Fehler beim Entwurf der Meldung: ${error.message}`);
+            } finally {
+                setLlmLoadingState(false, 'alert-draft-btn', 'alert-spinner');
+            }
+        };
+
+        /**
+         * Zeigt eine Fehlermeldung für LLM-Aufrufe an.
+         */
+        const displayLlmError = (message) => {
+            llmOutput.classList.add('hidden');
+            llmError.textContent = `Fehler: ${message}`;
+            llmError.classList.remove('hidden');
+        };
+
+        // =========================================================================
+        // === Tabellen- und UI-Logik ===
+        // =========================================================================
+
+        /**
+         * Rendert die Daten in die HTML-Tabelle
+         */
+        const renderTable = (data) => {
+            tableBody.innerHTML = '';
+            if (data.length === 0) {
+                statusMessage.textContent = 'Keine Daten in den letzten 2 Stunden zum Anzeigen vorhanden.';
+                statusMessage.classList.remove('hidden', 'bg-red-900', 'bg-green-900/50');
+                statusMessage.classList.add('bg-yellow-900', 'text-yellow-400');
+                plasmaTable.classList.add('hidden');
+                return;
+            }
+            
+            const nowUtc = new Date();
+
+            data.forEach((entry, index) => {
+                
+                let isArrived = false;
+                if (entry.arrival_time instanceof Date && !isNaN(entry.arrival_time)) {
+                    if (entry.arrival_time.getTime() <= nowUtc.getTime()) {
+                        isArrived = true;
+                    }
+                }
+
+                const isOdd = index % 2 !== 0;
+                const highlightClass = isArrived ? 'highlight-row' : '';
+                
+                const row = document.createElement('tr');
+                row.className = `border-b border-gray-700 hover:bg-gray-700 transition duration-150 ${isOdd ? 'bg-gray-700/50' : ''} ${highlightClass}`;
+
+                // --- Bz (Magnetfeld) Verbesserungen ---
+                let bzColor = 'text-gray-300';
+                let bzIcon = '';
+                const bz = parseFloat(entry.bz_nt);
+                if (!isNaN(bz)) {
+                    if (bz < -5) { 
+                        bzColor = 'text-red-400 font-bold';
+                        bzIcon = '⬇️'; 
+                    } else if (bz < 0) {
+                        bzColor = 'text-orange-300';
+                        bzIcon = '↓'; 
+                    } else if (bz > 5) {
+                        bzColor = 'text-blue-300';
+                        bzIcon = '⬆️'; 
+                    } else if (bz > 0) {
+                        bzColor = 'text-green-400';
+                        bzIcon = '↑'; 
+                    }
+                }
+
+                // Farben für die Geschwindigkeit
+                let speedColor = 'text-green-400';
+                const speed = parseFloat(entry.speed);
+                if (speed > 550) {
+                    speedColor = 'text-red-400 font-bold';
+                } else if (speed > 450) {
+                    speedColor = 'text-yellow-400';
+                }
+
+                // --- Dyn. Druck Hervorhebung und Kompression ---
+                let pressureColor = 'text-gray-300';
+                let compressionIcon = '';
+                const pressure = entry.dynamic_pressure_npa;
+                const density = parseFloat(entry.density);
+
+                if (typeof pressure === 'number') {
+                    if (pressure > CRITICAL_PRESSURE_NPA) {
+                        pressureColor = 'text-red-400 font-bold'; // Kritisch
+                    } else if (pressure > 5.0) {
+                        pressureColor = 'text-orange-400'; // Erhöht
+                    } else if (pressure < 0.5) {
+                        pressureColor = 'text-gray-500'; // Sehr niedrig
+                    }
+                }
+
+                // Kompressions-Indikator (SIR/Stoßwelle): Hohe Dichte UND erhöhter Druck
+                if (!isNaN(density) && density >= CRITICAL_DENSITY && typeof pressure === 'number' && pressure > 5.0) {
+                    pressureColor = 'text-yellow-300 font-extrabold'; 
+                    compressionIcon = '💥 STAU!'; 
+                }
+                
+                row.innerHTML += `<td class="py-3 px-6 text-left">${formatTime(parseUtcTimeTag(entry.time_tag))}</td>`;
+                row.innerHTML += `<td class="py-3 px-6 text-left ${speedColor}">${parseFloat(entry.speed).toFixed(1)}</td>`;
+                row.innerHTML += `<td class="py-3 px-6 text-left">${parseFloat(entry.density).toFixed(2)}</td>`;
+                
+                // Dynamischer Druck Zelle
+                const pressureValue = typeof pressure === 'number' ? pressure.toFixed(2) : String(pressure);
+                row.innerHTML += `<td class="py-3 px-6 text-left ${pressureColor}">
+                    ${compressionIcon ? `<span class="mr-1">${compressionIcon}</span>` : ''}${pressureValue}
+                </td>`;
+                
+                row.innerHTML += `<td class="py-3 px-6 text-left">${parseFloat(entry.by_nt).toFixed(1)}</td>`;
+                
+                // Bz (nT) - Mit grafischem Pfeil-Indikator
+                row.innerHTML += `<td class="py-3 px-6 text-left ${bzColor}">
+                    ${bzIcon ? `<span class="mr-1">${bzIcon}</span>` : ''}${parseFloat(entry.bz_nt).toFixed(1)}
+                </td>`;
+
+
+                // --- Überhol-Indikator (Schnelleres Plasma überholt älteres) ---
+                let isOvertaking = false;
+                if (index < data.length - 1) {
+                    const nextEntry = data[index + 1]; // Älterer Datenpunkt
+                    const currentArrival = entry.arrival_time instanceof Date ? entry.arrival_time.getTime() : Infinity;
+                    const nextArrival = nextEntry.arrival_time instanceof Date ? nextEntry.arrival_time.getTime() : Infinity;
+
+                    // Wenn die geschätzte Ankunftszeit des neueren Eintrags FRÜHER ist, wird überholt.
+                    if (currentArrival < nextArrival) {
+                        isOvertaking = true;
+                    }
+                }
+                
+                // Ankunftszeit
+                let arrivalTimeCell = `<td class="py-3 px-6 text-left">`;
+                
+                if (entry.arrival_time instanceof Date && !isNaN(entry.arrival_time)) {
+                    const diffMs = entry.arrival_time.getTime() - nowUtc.getTime();
+                    
+                    let timeText = formatTimeOnly(entry.arrival_time);
+                    let cellClass = '';
+
+                    // 1. Overtaking Markierung (höchste Priorität für visuelle Aufmerksamkeit)
+                    if (isOvertaking) {
+                        cellClass += ' bg-pink-900/40 border-l border-pink-600';
+                        timeText = `<span class="text-pink-400 font-extrabold">🏎️ ÜBERHOLT! ${timeText}</span>`;
+                    }
+                    
+                    // 2. Ankunft innerhalb 30 Minuten
+                    else if (diffMs > 0 && diffMs <= THIRTY_MINUTES_MS) {
+                        cellClass = 'bg-blue-900/40 border-r border-blue-600';
+                        timeText = `<span class="text-blue-300 font-extrabold">🔜 ${timeText}</span>`;
+                    } 
+                    
+                    // 3. Bereits angekommen
+                    else if (isArrived) {
+                        timeText = `<span class="font-bold text-gray-200">${timeText}</span>`;
+                    } 
+                    
+                    // 4. Normal
+                    else {
+                        timeText = `<span class="font-medium">${timeText}</span>`;
+                    }
+
+                    arrivalTimeCell = `<td class="py-3 px-6 text-left ${cellClass}">`;
+                    arrivalTimeCell += timeText;
+                    
+                } else {
+                    arrivalTimeCell += `<span class="text-red-500">${entry.arrival_time}</span>`;
+                }
+                arrivalTimeCell += `</td>`;
+                row.innerHTML += arrivalTimeCell;
+
+
+                // Laufzeit (h)
+                let travelTimeCell = `<td class="py-3 px-6 text-left">`;
+                if (typeof entry.travel_time_h === 'number') {
+                    travelTimeCell += `${entry.travel_time_h.toFixed(2)} h`;
+                } else {
+                    travelTimeCell += `N/A`;
+                }
+                travelTimeCell += `</td>`;
+                row.innerHTML += travelTimeCell;
+
+                tableBody.appendChild(row);
+            });
+            plasmaTable.classList.remove('hidden');
+        };
+
+        /**
+         * Sortiert die Daten basierend auf der ausgewählten Spalte und Richtung
+         */
+        const sortData = () => {
+            const keyMap = {
+                'time_tag': d => parseUtcTimeTag(d.time_tag).getTime(),
+                'speed': d => parseFloat(d.speed) || -Infinity,
+                'density': d => parseFloat(d.density) || -Infinity,
+                'dynamic_pressure_npa': d => typeof d.dynamic_pressure_npa === 'number' ? d.dynamic_pressure_npa : -Infinity,
+                'by_nt': d => parseFloat(d.by_nt) || -Infinity,
+                'bz_nt': d => parseFloat(d.bz_nt) || -Infinity,
+                'arrival_time': d => d.travel_time_ms !== null ? parseUtcTimeTag(d.time_tag).getTime() + d.travel_time_ms : -Infinity,
+                'travel_time_h': d => d.travel_time_h !== 'N/A' ? d.travel_time_h : -Infinity
+            };
+
+            allData.sort((a, b) => {
+                const valA = keyMap[sortColumn](a);
+                const valB = keyMap[sortColumn](b);
+
+                let comparison = 0;
+                if (valA > valB) {
+                    comparison = 1;
+                } else if (valA < valB) {
+                    comparison = -1;
+                }
+
+                return sortDirection === 'asc' ? comparison : comparison * -1;
+            });
+
+            document.querySelectorAll('[data-sort-icon]').forEach(icon => icon.textContent = '');
+            const currentIcon = document.querySelector(`[data-sort-icon="${sortColumn}"]`);
+            if (currentIcon) {
+                currentIcon.textContent = sortDirection === 'asc' ? '↑' : '↓';
+            }
+
+            renderTable(allData);
+        };
+
+        /**
+         * Holt die Daten von einem NOAA-Endpunkt
+         */
+        const fetchData = async (url) => {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP-Fehler beim Laden von ${url}: ${response.status}`);
+            }
+            const rawData = await response.json();
+            return rawData.slice(1);
+        };
+
+
+        /**
+         * Hauptfunktion zum Abrufen und Verarbeiten der Daten
+         */
+        const fetchSolarWindData = async () => {
+            loadingIndicator.classList.remove('hidden');
+            statusMessage.classList.add('hidden');
+            plasmaTable.classList.add('hidden');
+
+            try {
+                const [plasmaDataRaw, magDataRaw] = await Promise.all([
+                    fetchData(PLASMA_API_URL),
+                    fetchData(MAG_API_URL)
+                ]);
+
+                const MAG_BY_INDEX = 2;
+                const MAG_BZ_INDEX = 3;
+                const magMap = new Map();
+                magDataRaw.forEach(row => {
+                    if (row[MAG_BY_INDEX] !== 'null' && row[MAG_BZ_INDEX] !== 'null') {
+                        magMap.set(row[0], {
+                            by_nt: row[MAG_BY_INDEX],
+                            bz_nt: row[MAG_BZ_INDEX]
+                        });
+                    }
+                });
+
+                const processedData = plasmaDataRaw.map(row => {
+                    const timeTag = row[0];
+                    const magEntry = magMap.get(timeTag) || { by_nt: 'N/A', bz_nt: 'N/A' };
+                    
+                    const entry = {
+                        time_tag: timeTag,
+                        density: row[1],
+                        speed: row[2],
+                        by_nt: magEntry.by_nt,
+                        bz_nt: magEntry.bz_nt,
+                    };
+                    return calculateArrival(entry);
+                });
+
+                if (processedData.length > 0) {
+                    const latestEntry = processedData.reduce((prev, current) => {
+                        if (!current.time_tag) return prev; 
+                        if (!prev.time_tag) return current;
+
+                        const prevTime = parseUtcTimeTag(prev.time_tag).getTime();
+                        const currTime = parseUtcTimeTag(current.time_tag).getTime();
+
+                        return (currTime > prevTime) ? current : prev;
+                    }, processedData.find(e => e.time_tag) || { time_tag: '1970-01-01 00:00:00.000' });
+
+                    const latestTimeMs = parseUtcTimeTag(latestEntry.time_tag).getTime();
+                    const cutoffTimeMs = latestTimeMs - TWO_HOURS_MS;
+
+                    allData = processedData.filter(entry => {
+                        const entryTimeMs = parseUtcTimeTag(entry.time_tag).getTime();
+                        return entryTimeMs >= cutoffTimeMs;
+                    });
+
+                    statusMessage.textContent = `Daten (24h Quellen) erfolgreich geladen. Zeige ${allData.length} Einträge der letzten 2 Stunden (bis zum letzten Messwert, UTC). Nächste Aktualisierung in 1 Minute.`;
+                    statusMessage.classList.remove('hidden', 'bg-red-900', 'bg-yellow-900');
+                    statusMessage.classList.add('bg-green-900/50', 'text-green-400', 'font-semibold');
+
+                } else {
+                    allData = [];
+                    statusMessage.textContent = 'Daten erfolgreich geladen, aber keine Einträge in den letzten 2 Stunden gefunden.';
+                    statusMessage.classList.remove('hidden', 'bg-red-900', 'bg-green-900/50');
+                    statusMessage.classList.add('bg-yellow-900', 'text-yellow-400');
+                }
+
+                sortData();
+
+            } catch (error) {
+                console.error("Fehler beim Abrufen der Daten:", error);
+                statusMessage.textContent = `Fehler beim Laden der Daten: ${error.message}. Nächste Aktualisierung in 1 Minute.`;
+                statusMessage.classList.remove('hidden', 'bg-green-900/50', 'bg-yellow-900');
+                statusMessage.classList.add('bg-red-900', 'text-red-400');
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        };
+
+        /**
+         * Startet den initialen Ladevorgang und richtet den Auto-Refresh-Intervall ein.
+         */
+        const startApp = () => {
+            headers.forEach(header => {
+                header.addEventListener('click', (e) => {
+                    const key = e.currentTarget.dataset.sortKey;
+                    if (sortColumn === key) {
+                        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        sortColumn = key;
+                        sortDirection = 'desc';
+                    }
+                    sortData();
+                });
+            });
+
+            // Event-Listener für Gemini-Buttons
+            summarizeBtn.addEventListener('click', summarizeSpaceWeather);
+            alertDraftBtn.addEventListener('click', draftAlertMessage);
+            
+            // Event-Listener für Kopierfunktion
+            copyBtn.addEventListener('click', () => {
+                const textToCopy = llmContent.textContent;
+                const textarea = document.createElement('textarea');
+                textarea.value = textToCopy;
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    copyMessage.classList.remove('hidden');
+                    setTimeout(() => copyMessage.classList.add('hidden'), 3000);
+                } catch (err) {
+                    console.error('Kopieren fehlgeschlagen:', err);
+                }
+                document.body.removeChild(textarea);
+            });
+
+
+            fetchSolarWindData();
+            setInterval(fetchSolarWindData, REFRESH_INTERVAL_MS);
+        };
+
+        window.onload = startApp;
+    </script>
+</body>
+</html>
