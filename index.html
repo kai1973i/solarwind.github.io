@@ -50,6 +50,23 @@
             background-color: #422006 !important; /* Dunkelorange */
             border-left: 4px solid #f97316 !important;
         }
+        .status-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+        .status-metric {
+            background-color: #161b22;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #30363d;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 1.875rem; /* text-3xl */
+            font-weight: 800; /* font-extrabold */
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -62,6 +79,26 @@
             Daten der NOAA SWPC (Plasma und Magnetfeld) mit berechneter geschätzter Ankunftszeit und Substurm-Kopplungsindex.
         </p>
 
+        <!-- Echtzeit-Statuskarte (Zeigt die Auswirkung des L1-Pakets) -->
+        <div id="current-status-card" class="mb-8 status-card-grid">
+            <div class="status-metric">
+                <p class="text-sm uppercase text-gray-400">Neuster Messwert (L1)</p>
+                <p id="latest-time-tag" class="metric-value text-gray-300">-</p>
+            </div>
+            <div class="status-metric">
+                <p class="text-sm uppercase text-gray-400">Gesch. Ankunft (Erde)</p>
+                <p id="arrival-time-status" class="metric-value text-blue-400">-</p>
+            </div>
+            <div class="status-metric">
+                <p class="text-sm uppercase text-gray-400">Bz (Kopplung, nT)</p>
+                <p id="bz-status" class="metric-value text-gray-300">-</p>
+            </div>
+            <div class="status-metric">
+                <p class="text-sm uppercase text-gray-400">Substurm-Risiko (SCI)</p>
+                <p id="sci-risk-status" class="metric-value text-gray-300">-</p>
+            </div>
+        </div>
+        
         <!-- Status- und Ladeanzeige -->
         <div id="status-message" class="text-center p-4 my-4 bg-gray-800 rounded-lg shadow-lg hidden"></div>
         <div id="loading-indicator" class="flex justify-center items-center p-8">
@@ -106,11 +143,6 @@
                             ⚡ SCI (V·Bs)
                             <span data-sort-icon="substorm_coupling_index" class="ml-1"></span>
                         </th>
-                        <!-- Kritische Aufbauzeit -->
-                        <th class="py-3 px-6 text-left header-cell" data-sort-key="critical_buildup_duration_h">
-                            Krit. Aufbauzeit (h)
-                            <span data-sort-icon="critical_buildup_duration_h" class="ml-1"></span>
-                        </th>
                         <!-- Geschätzte Sturmbeginn-Zeit -->
                         <th class="py-3 px-6 text-left header-cell" data-sort-key="estimated_onset_time">
                             Gesch. Sturmbeginn (UTC)
@@ -126,15 +158,6 @@
                             Gesch. Ankunftszeit (Erde)
                             <span data-sort-icon="arrival_time" class="ml-1"></span>
                         </th>
-                         <!-- Laufzeit (Minuten) -->
-                        <th class="py-3 px-6 text-left header-cell" data-sort-key="travel_time_m">
-                            Laufzeit (min)
-                            <span data-sort-icon="travel_time_m" class="ml-1"></span>
-                        </th>
-                        <th class="py-3 px-6 text-left header-cell" data-sort-key="travel_time_h">
-                            Laufzeit (h)
-                            <span data-sort-icon="travel_time_h" class="ml-1"></span>
-                        </th>
                     </tr>
                 </thead>
                 <tbody id="table-body" class="text-gray-300 text-sm font-light">
@@ -148,11 +171,10 @@
             <span class="font-bold text-blue-300">🔜</span> in der Ankunftszeit: Der Solarwind wird **innerhalb der nächsten 30 Minuten** erwartet.<br>
             <span class="font-bold text-pink-400">🏎️ ÜBERHOLT!</span>: Ein später gemessener Plasmaabschnitt wird **früher** erwartet, was auf eine **Geschwindigkeitsfront** hindeutet.<br>
             <span class="font-bold text-yellow-300">Total Bt (nT)</span>: Der **Gesamtwert** des Magnetfelds. Werte **über $15\text{ nT}$** sind hoch (oft assoziiert mit Stoßwellen).
-            <br><span class="font-bold text-red-400">⬇️ Bz</span>: Zeigt die **Südrichtung** des Magnetfelds an, ein kritischer Indikator für geomagnetische Aktivität und Substürme.<br>
+            <br><span class="font-bold text-red-400">⬇️ Bz</span>: Zeigt die **Südrichtung** des Magnetfelds an, ein kritischer Indikator für geomagnetische Aktivität und Substürme. **(Dies ist die wichtigste Information, die einem Boden-Magnetometer-Index vorausgeht)**<br>
             <span class="font-bold text-yellow-300">💥 STAU! Dyn. Druck</span>: Zeigt eine **starke Kompressionszone (SIR/Stoßwelle)** an (Dichte > $15\text{ p/cm}^3$ und Druck > $5\text{ nPa}$).<br>
             <span class="font-bold text-red-400">Dyn. Druck (nPa)</span>: Werte **über $10\text{ nPa}$** sind stark erhöht und deuten auf eine erhebliche Magnetosphären-Kompression hin.<br>
             <span class="font-bold text-red-400">🚨 SCI (V·Bs)</span>: Hohe Werte (**> 3500**) signalisieren ein **hohes Potenzial für Substürme** (starke Polarlichter).
-            <br><span class="font-bold text-red-400">Krit. Aufbauzeit (h)</span>: Die **Mindestdauer**, die dieser Zustand anhalten muss, um einen Sturm auszulösen. **Niedrigere Werte sind kritischer.**
             <br><span class="font-bold text-red-300">⚠️ Gesch. Sturmbeginn</span>: Die **geschätzte früheste Zeit** für den **Beginn des geomagnetischen Sturms** (Ankunft + Aufbauzeit).
             <br>Hinweis: Die Daten werden vom NOAA Space Weather Prediction Center (SWPC) bereitgestellt und am L1-Punkt gemessen. Die Tabelle wird jede Minute automatisch aktualisiert.
         </p>
@@ -170,23 +192,21 @@
         const REFRESH_INTERVAL_MS = 60 * 1000;
         
         // Konstante für die Berechnung des Dynamischen Drucks in nPa
-        // Formel: P_dyn (nPa) ≈ 1.672 * 10^-6 * Density (p/cm³) * Speed (km/s)^2
         const DYNAMIC_PRESSURE_FACTOR = 0.001672;
-        const CRITICAL_PRESSURE_NPA = 10.0; // Schwellenwert für starke Kompression
-        const CRITICAL_DENSITY = 15.0; // Schwellenwert für Kompressions-Ereignisse (SIR/Stoßwelle)
+        const CRITICAL_PRESSURE_NPA = 10.0;
+        const CRITICAL_DENSITY = 15.0;
 
         // KONSTANTEN FÜR SUBSTORM COUPLING INDEX (SCI)
-        // SCI ≈ Speed * max(0, -Bz) - Vereinfachte Kopplungsfunktion V * Bs
         const SCI_WATCH_LOW = 1000; 
         const SCI_WATCH_ELEVATED = 2000; 
         const SCI_WATCH_HIGH = 3500; 
         
-        // KONSTANTEN FÜR KRITISCHE AUFBAUZEIT (VEREINFACHTE REGELN)
-        const SCI_DURATION_HIGH_H = 1.75; // 1.5 bis 2.0 Stunden
-        const SCI_DURATION_ELEVATED_H = 2.5; // 2.0 bis 3.0 Stunden
-        const SCI_DURATION_MEDIUM_H = 3.0; // ca. 3.0 Stunden
-        const SCI_DURATION_LOW_H = 100.0; // Platzhalter für > 3.0 h (zum Sortieren)
-        const CRITICAL_BT = 15.0; // Schwellenwert für hohes Totalfeld
+        // KONSTANTEN FÜR KRITISCHE AUFBAUZEIT (WERTE WERDEN IM CODE NOCH VERWENDET)
+        const SCI_DURATION_HIGH_H = 1.75; 
+        const SCI_DURATION_ELEVATED_H = 2.5;
+        const SCI_DURATION_MEDIUM_H = 3.0;
+        const SCI_DURATION_LOW_H = 100.0; 
+        const CRITICAL_BT = 15.0; 
 
         // --- DOM-Elemente ---
         const tableBody = document.getElementById('table-body');
@@ -194,6 +214,13 @@
         const loadingIndicator = document.getElementById('loading-indicator');
         const statusMessage = document.getElementById('status-message');
         const headers = document.querySelectorAll('.header-cell');
+
+        // Statuskarten-Elemente
+        const latestTimeTagEl = document.getElementById('latest-time-tag');
+        const arrivalTimeStatusEl = document.getElementById('arrival-time-status');
+        const bzStatusEl = document.getElementById('bz-status');
+        const sciRiskStatusEl = document.getElementById('sci-risk-status');
+
 
         let allData = [];
         let sortColumn = 'time_tag';
@@ -216,6 +243,7 @@
 
         /**
          * Liefert die kritische Dauer in Stunden (als Zahl) basierend auf dem SCI-Wert.
+         * Diese Funktion wird weiterhin benötigt, um die "Gesch. Sturmbeginn"-Zeit zu berechnen.
          */
         const getRequiredBuildupDuration = (sci) => {
             if (typeof sci !== 'number' || sci < SCI_WATCH_LOW) return SCI_DURATION_LOW_H; 
@@ -262,7 +290,7 @@
             if (!isNaN(bx) && !isNaN(by) && !isNaN(bz)) {
                 totalBt = Math.sqrt(bx*bx + by*by + bz*bz);
             } else if (entry.bt_nt) {
-                 totalBt = parseFloat(entry.bt_nt); // Falls Bt direkt verfügbar ist
+                 totalBt = parseFloat(entry.bt_nt);
             }
 
             // 2. Berechnung des Dynamischen Drucks (nPa)
@@ -274,17 +302,17 @@
             // 3. Berechnung des Substorm Coupling Index (SCI)
             let sci = 'N/A';
             if (!isNaN(speed) && speed > 0 && !isNaN(bz)) {
-                // SCI = Speed * max(0, -Bz) -> Nur relevant, wenn Bz südlich (negativ) ist
+                // SCI (V_sw * B_s)
                 sci = speed * Math.max(0, -bz);
             }
 
             // 4. Qualitative Risikobewertung
             const sciRiskLevel = getSciRiskLevel(sci);
 
-            // 5. Kritische Aufbauzeit (vereinfachte Regel)
+            // 5. Kritische Aufbauzeit (wird für Sturmbeginn benötigt)
             const criticalBuildupDuration = getRequiredBuildupDuration(sci);
             
-            // 6. Berechnung der Ankunftszeit (nur wenn Geschwindigkeit gültig)
+            // 6. Berechnung der Ankunftszeit
             let travelTimeHours = 'N/A';
             let travelTimeMinutes = 'N/A';
             let travelTimeMs = null;
@@ -302,7 +330,6 @@
             
             // 7. Geschätzte Sturmbeginn-Zeit (Ankunftszeit + Kritische Aufbauzeit)
             if (arrivalDate instanceof Date && !isNaN(arrivalDate) && criticalBuildupDuration !== SCI_DURATION_LOW_H) {
-                // Kritische Dauer in Millisekunden umrechnen
                 const durationMs = criticalBuildupDuration * 60 * 60 * 1000;
                 estimatedOnset = new Date(arrivalDate.getTime() + durationMs);
             }
@@ -313,14 +340,94 @@
                 dynamic_pressure_npa: dynamicPressure,
                 substorm_coupling_index: sci, 
                 sci_risk_level: sciRiskLevel, 
-                critical_buildup_duration_h: criticalBuildupDuration,
-                total_bt: totalBt, // NEU
+                critical_buildup_duration_h: criticalBuildupDuration, // Wird intern behalten
+                total_bt: totalBt, 
                 travel_time_h: travelTimeHours,
-                travel_time_m: travelTimeMinutes, // NEU
+                travel_time_m: travelTimeMinutes, 
                 travel_time_ms: travelTimeMs,
                 arrival_time: arrivalDate,
                 estimated_onset_time: estimatedOnset, 
             };
+        };
+
+
+        // =========================================================================
+        // === Statuskarten-Logik ===
+        // =========================================================================
+
+        /**
+         * Aktualisiert die Statuskarte über der Tabelle mit den aktuellsten Werten.
+         */
+        const updateStatusCard = (entry) => {
+            const nowUtc = new Date();
+            
+            // 1. Messzeitpunkt
+            latestTimeTagEl.textContent = entry.time_tag.substring(11, 16) + ' UTC';
+
+            // 2. Ankunftszeit
+            let arrivalText = 'Wird berechnet...';
+            let arrivalColor = 'text-gray-300';
+            
+            if (entry.arrival_time instanceof Date && !isNaN(entry.arrival_time)) {
+                const diffMs = entry.arrival_time.getTime() - nowUtc.getTime();
+                const arrivalTimeStr = entry.arrival_time.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+                
+                if (diffMs <= 0) {
+                    arrivalText = `ANGEKOMMEN! ${arrivalTimeStr} UTC`;
+                    arrivalColor = 'text-green-500';
+                } else if (diffMs <= THIRTY_MINUTES_MS) {
+                    arrivalText = `🔜 ${arrivalTimeStr} UTC (Bald!)`;
+                    arrivalColor = 'text-red-400';
+                } else {
+                    arrivalText = `${arrivalTimeStr} UTC (${entry.travel_time_h.toFixed(1)} h)`;
+                    arrivalColor = 'text-blue-400';
+                }
+            }
+            arrivalTimeStatusEl.textContent = arrivalText;
+            arrivalTimeStatusEl.className = `metric-value ${arrivalColor}`;
+
+            // 3. Bz-Komponente
+            const bz = parseFloat(entry.bz_nt);
+            let bzText = 'N/A';
+            let bzColor = 'text-gray-300';
+            
+            if (!isNaN(bz)) {
+                bzText = `${bz.toFixed(1)} nT`;
+                if (bz < -5) { 
+                    bzColor = 'text-red-400 font-extrabold';
+                    bzText = `⬇️ SÜD ${bzText}`;
+                } else if (bz < 0) {
+                    bzColor = 'text-orange-300';
+                    bzText = `↓ Süd ${bzText}`;
+                } else if (bz > 5) {
+                    bzColor = 'text-blue-300';
+                    bzText = `⬆️ Nord ${bzText}`;
+                } else if (bz > 0) {
+                    bzColor = 'text-green-400';
+                    bzText = `↑ Nord ${bzText}`;
+                }
+            }
+            bzStatusEl.textContent = bzText;
+            bzStatusEl.className = `metric-value ${bzColor}`;
+
+            // 4. SCI Risiko
+            const sci = entry.substorm_coupling_index;
+            let sciText = entry.sci_risk_level;
+            let sciColor = 'text-gray-300';
+
+            if (typeof sci === 'number') {
+                if (sci > SCI_WATCH_HIGH) {
+                    sciColor = 'text-red-400 font-extrabold';
+                } else if (sci > SCI_WATCH_ELEVATED) {
+                    sciColor = 'text-orange-400 font-bold';
+                } else if (sci > SCI_WATCH_LOW) {
+                    sciColor = 'text-yellow-400';
+                }
+                sciText = sciText.replace('🚨 HOCH', 'HOCH');
+                sciText = sciText.replace('⚠️ Erhöht', 'Erhöht');
+            }
+            sciRiskStatusEl.textContent = sciText;
+            sciRiskStatusEl.className = `metric-value ${sciColor}`;
         };
 
 
@@ -395,15 +502,15 @@
 
                 if (typeof pressure === 'number') {
                     if (pressure > CRITICAL_PRESSURE_NPA) {
-                        pressureColor = 'text-red-400 font-bold'; // Kritisch
+                        pressureColor = 'text-red-400 font-bold'; 
                     } else if (pressure > 5.0) {
-                        pressureColor = 'text-orange-400'; // Erhöht
+                        pressureColor = 'text-orange-400'; 
                     } else if (pressure < 0.5) {
-                        pressureColor = 'text-gray-500'; // Sehr niedrig
+                        pressureColor = 'text-gray-500'; 
                     }
                 }
 
-                // Kompressions-Indikator (SIR/Stoßwelle): Hohe Dichte UND erhöhter Druck
+                // Kompressions-Indikator
                 if (!isNaN(density) && density >= CRITICAL_DENSITY && typeof pressure === 'number' && pressure > 5.0) {
                     pressureColor = 'text-yellow-300 font-extrabold'; 
                     compressionIcon = '💥 STAU!'; 
@@ -425,7 +532,6 @@
                 if (typeof sci === 'number') {
                     if (sci > SCI_WATCH_HIGH) {
                         sciColor = 'text-red-400 font-extrabold';
-                        // Höchste Warnstufe: Hintergrund hervorheben
                         row.classList.add('substorm-watch-high'); 
                     } else if (sci > SCI_WATCH_ELEVATED) {
                         sciColor = 'text-orange-400 font-bold';
@@ -447,46 +553,26 @@
                     ${compressionIcon ? `<span class="mr-1">${compressionIcon}</span>` : ''}${pressureValue}
                 </td>`;
                 
-                // Total Bt Zelle (NEU)
+                // Total Bt Zelle
                 const totalBtValue = typeof totalBt === 'number' ? totalBt.toFixed(1) : String(totalBt);
                 row.innerHTML += `<td class="py-3 px-6 text-left ${btColor}">${totalBtValue}</td>`;
                 
-                // Bz (nT) - Mit grafischem Pfeil-Indikator
+                // Bz (nT)
                 row.innerHTML += `<td class="py-3 px-6 text-left ${bzColor}">
                     ${bzIcon ? `<span class="mr-1">${bzIcon}</span>` : ''}${parseFloat(entry.bz_nt).toFixed(1)}
                 </td>`;
 
-                // SCI (Substorm Coupling Index) Zelle - ZEIGT DEN WERT AN
+                // SCI (Substorm Coupling Index) Zelle
                  row.innerHTML += `<td class="py-3 px-6 text-left ${sciColor}">
                     ${sciValue}
                 </td>`;
-                
-                // Kritische Aufbauzeit
-                let durationColor = 'text-gray-400';
-                const duration = entry.critical_buildup_duration_h;
-                let durationText = duration === SCI_DURATION_LOW_H ? '> 3.0 h' : 'N/A';
-
-                if (duration === SCI_DURATION_HIGH_H) {
-                    durationColor = 'text-red-400 font-bold';
-                    durationText = '1.5 - 2.0 h';
-                } else if (duration === SCI_DURATION_ELEVATED_H) {
-                    durationColor = 'text-orange-400';
-                    durationText = '2.0 - 3.0 h';
-                } else if (duration === SCI_DURATION_MEDIUM_H) {
-                    durationColor = 'text-yellow-400';
-                    durationText = 'ca. 3.0 h';
-                }
-                
-                row.innerHTML += `<td class="py-3 px-6 text-left ${durationColor}">${durationText}</td>`;
                 
                 // Geschätzte Sturmbeginn-Zeit
                 let onsetTimeText = 'N/A';
                 let onsetTimeColor = 'text-gray-400';
                 
                 if (entry.estimated_onset_time instanceof Date && !isNaN(entry.estimated_onset_time)) {
-                    // Zeit (HH:MM:SS) aus dem formatierten String extrahieren
                     onsetTimeText = formatTime(entry.estimated_onset_time).substring(11, 20); 
-                    
                     const diffMs = entry.estimated_onset_time.getTime() - nowUtc.getTime();
 
                     if (diffMs > 0 && diffMs <= THIRTY_MINUTES_MS) {
@@ -502,7 +588,7 @@
                 
                 row.innerHTML += `<td class="py-3 px-6 text-left ${onsetTimeColor}">${onsetTimeText}</td>`;
 
-                // Substurm-Risiko Zelle - ZEIGT DEN LEVEL-STRING AN
+                // Substurm-Risiko Zelle
                 let riskColor = '';
                 if (entry.sci_risk_level.startsWith('🚨 HOCH')) {
                     riskColor = 'text-red-400 font-bold';
@@ -519,14 +605,13 @@
                 </td>`;
 
 
-                // --- Überhol-Indikator (Schnelleres Plasma überholt älteres) ---
+                // --- Überhol-Indikator ---
                 let isOvertaking = false;
                 if (index < data.length - 1) {
-                    const nextEntry = data[index + 1]; // Älterer Datenpunkt
+                    const nextEntry = data[index + 1]; 
                     const currentArrival = entry.arrival_time instanceof Date ? entry.arrival_time.getTime() : Infinity;
                     const nextArrival = nextEntry.arrival_time instanceof Date ? nextEntry.arrival_time.getTime() : Infinity;
 
-                    // Wenn die geschätzte Ankunftszeit des neueren Eintrags FRÜHER ist, wird überholt.
                     if (currentArrival < nextArrival) {
                         isOvertaking = true;
                     }
@@ -541,24 +626,20 @@
                     let timeText = entry.arrival_time.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' }) + ' UTC';
                     let cellClass = '';
 
-                    // 1. Overtaking Markierung (höchste Priorität für visuelle Aufmerksamkeit)
                     if (isOvertaking) {
                         cellClass += ' bg-pink-900/40 border-l border-pink-600';
                         timeText = `<span class="text-pink-400 font-extrabold">🏎️ ÜBERHOLT! ${timeText}</span>`;
                     }
                     
-                    // 2. Ankunft innerhalb 30 Minuten
                     else if (diffMs > 0 && diffMs <= THIRTY_MINUTES_MS) {
                         cellClass = 'bg-blue-900/40 border-r border-blue-600';
                         timeText = `<span class="text-blue-300 font-extrabold">🔜 ${timeText}</span>`;
                     } 
                     
-                    // 3. Bereits angekommen
                     else if (isArrived) {
                         timeText = `<span class="font-bold text-gray-200">${timeText}</span>`;
                     } 
                     
-                    // 4. Normal
                     else {
                         timeText = `<span class="font-medium">${timeText}</span>`;
                     }
@@ -572,27 +653,6 @@
                 arrivalTimeCell += `</td>`;
                 row.innerHTML += arrivalTimeCell;
                 
-                // Laufzeit (Minuten) - NEU
-                let travelTimeMCell = `<td class="py-3 px-6 text-left">`;
-                if (typeof entry.travel_time_m === 'number') {
-                    travelTimeMCell += `${entry.travel_time_m.toFixed(0)} min`;
-                } else {
-                    travelTimeMCell += `N/A`;
-                }
-                travelTimeMCell += `</td>`;
-                row.innerHTML += travelTimeMCell;
-
-
-                // Laufzeit (h)
-                let travelTimeCell = `<td class="py-3 px-6 text-left">`;
-                if (typeof entry.travel_time_h === 'number') {
-                    travelTimeCell += `${entry.travel_time_h.toFixed(2)} h`;
-                } else {
-                    travelTimeCell += `N/A`;
-                }
-                travelTimeCell += `</td>`;
-                row.innerHTML += travelTimeCell;
-
                 tableBody.appendChild(row);
             });
             plasmaTable.classList.remove('hidden');
@@ -610,14 +670,9 @@
                 'total_bt': d => typeof d.total_bt === 'number' ? d.total_bt : -Infinity,
                 'bz_nt': d => parseFloat(d.bz_nt) || -Infinity,
                 'substorm_coupling_index': d => typeof d.substorm_coupling_index === 'number' ? d.substorm_coupling_index : -Infinity,
-                // Sortiere die kritische Dauer in aufsteigender Reihenfolge (kleinere Dauer ist kritischer)
-                'critical_buildup_duration_h': d => typeof d.critical_buildup_duration_h === 'number' ? d.critical_buildup_duration_h : Infinity, 
-                // Sortiere nach geschätztem Beginn
                 'estimated_onset_time': d => d.estimated_onset_time instanceof Date ? d.estimated_onset_time.getTime() : Infinity,
                 'sci_risk_level': d => typeof d.substorm_coupling_index === 'number' ? d.substorm_coupling_index : -Infinity, 
                 'arrival_time': d => d.travel_time_ms !== null ? parseUtcTimeTag(d.time_tag).getTime() + d.travel_time_ms : -Infinity,
-                'travel_time_h': d => d.travel_time_h !== 'N/A' ? d.travel_time_h : -Infinity,
-                'travel_time_m': d => d.travel_time_m !== 'N/A' ? d.travel_time_m : -Infinity
             };
 
             allData.sort((a, b) => {
@@ -631,14 +686,11 @@
                     comparison = -1;
                 }
 
-                // Ausnahme: ASC für Kritische Aufbauzeit, Sturmbeginn und Laufzeiten (kürzer ist bald)
+                // Ausnahme: ASC für Sturmbeginn (kürzer/früher ist bald)
                 const isAscendingSort = sortDirection === 'asc' || 
-                                        sortColumn === 'critical_buildup_duration_h' || 
-                                        sortColumn === 'estimated_onset_time' ||
-                                        sortColumn === 'travel_time_h' || 
-                                        sortColumn === 'travel_time_m';
+                                        sortColumn === 'estimated_onset_time';
                 
-                // Für Bz und SCI (Risiko) ist DESC die kritischere Richtung (größere Zahl/negative Zahl)
+                // Für Bz ist DESC die kritischere Richtung (negativ zuerst)
                 if (sortColumn === 'bz_nt') {
                     // Bz: Größere NEGATIVE Zahl ist kritischer. Daher DESC (negativ zuerst)
                     return sortDirection === 'asc' ? comparison : comparison * -1;
@@ -652,13 +704,7 @@
             const currentIcon = document.querySelector(`[data-sort-icon="${sortColumn}"]`);
             if (currentIcon) {
                 // Anzeige der Sortierrichtung
-                if (sortColumn === 'critical_buildup_duration_h' || sortColumn === 'estimated_onset_time' || sortColumn === 'travel_time_h' || sortColumn === 'travel_time_m') {
-                    // Für diese Spalten ist ASC (↑) die "logische" Standardrichtung (bald/kurz zuerst)
-                    currentIcon.textContent = sortDirection === 'asc' ? '↑' : '↓';
-                } else {
-                    // Für alle anderen ist DESC (↓) die Standardrichtung (neueste/höchste zuerst)
-                    currentIcon.textContent = sortDirection === 'asc' ? '↑' : '↓';
-                }
+                currentIcon.textContent = sortDirection === 'asc' ? '↑' : '↓';
             }
             // Standardmäßig nach Zeit absteigend sortieren
             if (sortColumn === 'time_tag') {
@@ -691,8 +737,6 @@
             plasmaTable.classList.add('hidden');
 
             try {
-                // Exponential Backoff für Fetch-Anfragen (nur zur Simulation, da die Umgebung dies verwaltet)
-                // Bei einem echten Fehler würde ich hier Wiederholungslogik implementieren.
                 
                 const [plasmaDataRaw, magDataRaw] = await Promise.all([
                     fetchData(PLASMA_API_URL),
@@ -709,13 +753,12 @@
                 const magMap = new Map();
                 magDataRaw.forEach(row => {
                     const timeTag = row[MAG_TIME_INDEX];
-                    // Überprüfung, ob die kritischen Werte verfügbar sind
                     if (row[MAG_BX_INDEX] !== 'null' && row[MAG_BY_INDEX] !== 'null' && row[MAG_BZ_INDEX] !== 'null') {
                         magMap.set(timeTag, {
                             bx_nt: row[MAG_BX_INDEX],
                             by_nt: row[MAG_BY_INDEX],
                             bz_nt: row[MAG_BZ_INDEX],
-                            bt_nt: row[MAG_BT_INDEX] || 'N/A' // Bt ist Index 4, optional
+                            bt_nt: row[MAG_BT_INDEX] || 'N/A'
                         });
                     }
                 });
@@ -728,24 +771,22 @@
                         time_tag: timeTag,
                         density: row[1],
                         speed: row[2],
-                        bx_nt: magEntry.bx_nt, // Hinzugefügt
+                        bx_nt: magEntry.bx_nt, 
                         by_nt: magEntry.by_nt,
                         bz_nt: magEntry.bz_nt,
-                        bt_nt: magEntry.bt_nt, // Hinzugefügt
+                        bt_nt: magEntry.bt_nt,
                     };
                     return calculateArrival(entry);
                 });
 
                 if (processedData.length > 0) {
-                    const latestEntry = processedData.reduce((prev, current) => {
-                        if (!current.time_tag) return prev; 
-                        if (!prev.time_tag) return current;
-
-                        const prevTime = parseUtcTimeTag(prev.time_tag).getTime();
-                        const currTime = parseUtcTimeTag(current.time_tag).getTime();
-
-                        return (currTime > prevTime) ? current : prev;
-                    }, processedData.find(e => e.time_tag) || { time_tag: '1970-01-01 00:00:00.000' });
+                    
+                    // Finde den neuesten Eintrag zur Anzeige im Status-Dashboard
+                    const sortedByTime = [...processedData].sort((a, b) => 
+                        parseUtcTimeTag(b.time_tag).getTime() - parseUtcTimeTag(a.time_tag).getTime()
+                    );
+                    const latestEntry = sortedByTime[0];
+                    updateStatusCard(latestEntry);
 
                     const latestTimeMs = parseUtcTimeTag(latestEntry.time_tag).getTime();
                     const cutoffTimeMs = latestTimeMs - TWO_HOURS_MS;
@@ -786,7 +827,6 @@
                 header.addEventListener('click', (e) => {
                     const key = e.currentTarget.dataset.sortKey;
                     if (sortColumn === key) {
-                        // Bei Sortierung nach Bz wollen wir, dass die negative Zahl (kritisch) zuerst kommt
                         if (key === 'bz_nt') {
                             sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
                         } else {
@@ -795,15 +835,12 @@
                     } else {
                         sortColumn = key;
                         
-                        // Standard Sortierung für kritische Werte ist DESC (höchster Wert zuerst)
-                        // Ausnahme: Zeit/Dauer (ASC für kürzer/früher)
-                        if (key === 'critical_buildup_duration_h' || key === 'estimated_onset_time' || key === 'travel_time_h' || key === 'travel_time_m') {
+                        if (key === 'estimated_onset_time') {
                             sortDirection = 'asc'; 
                         } else {
                             sortDirection = 'desc'; 
                         }
 
-                         // Bz-Standard-Sortierung: DESC (negativ, d.h. südlich, zuerst)
                          if (key === 'bz_nt') {
                             sortDirection = 'asc'; 
                         }
