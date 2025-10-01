@@ -101,7 +101,7 @@
                 <p id="bz-status" class="metric-value text-gray-300">-</p>
             </div>
             <div class="status-metric">
-                <p class="text-sm uppercase text-gray-400">Gesch. AL-Potenzial</p>
+                <p class="text-sm uppercase text-gray-400">Prog. AL-Index</p>
                 <p id="al-potential-status" class="metric-value text-gray-300">-</p>
             </div>
         </div>
@@ -158,9 +158,9 @@
                             Bz (nT)
                             <span data-sort-icon="bz_nt" class="ml-1"></span>
                         </th>
-                        <!-- SCI (Neu: AL-Potenzial Spalte) -->
+                        <!-- NEU: Prognostizierter AL-Index Spalte -->
                          <th class="py-3 px-6 text-left header-cell" data-sort-key="estimated_al_potential">
-                            📉 Gesch. AL-Potenzial (nT)
+                            📉 Prognostizierter AL-Index (nT)
                             <span data-sort-icon="estimated_al_potential" class="ml-1"></span>
                         </th>
                         <th class="py-3 px-6 text-left header-cell" data-sort-key="substorm_coupling_index">
@@ -198,8 +198,8 @@
             <span class="font-bold text-yellow-300">💥 STAU! Dyn. Druck</span>: Zeigt eine **starke Kompressionszone (SIR/Stoßwelle)** an (Dichte > $15\text{ p/cm}^3$ und Druck > $5\text{ nPa}$).<br>
             <span class="font-bold text-red-400">Dyn. Druck (nPa)</span>: Werte **über $10\text{ nPa}$** sind stark erhöht und deuten auf eine erhebliche Magnetosphären-Kompression hin.<br>
             <span class="font-bold text-red-400">🚨 SCI (V·Bs)</span>: Hohe Werte (**> 3500**) signalisieren ein **hohes Potenzial für Substürme** (starke Polarlichter).
+            <br><span class="font-bold text-red-300">📉 Prognostizierter AL-Index (nT)</span>: Basiert auf einer einfachen Korrelation zur Vorhersage der maximalen Stärke des westlichen Elektrojet-Stromes. **Negativere Werte (z. B. $-200\text{ nT}$ oder mehr)** deuten auf moderate bis starke Aktivität hin (hier wird der Betrag angezeigt).
             <br><span class="font-bold text-red-300">⚠️ Gesch. Sturmbeginn</span>: Die **geschätzte früheste Zeit** für den **Beginn des geomagnetischen Sturms** (Ankunft + Aufbauzeit).
-            <br><span class="font-bold text-red-400">📉 Gesch. AL-Potenzial</span>: Basiert auf einer einfachen Korrelation zur Vorhersage der maximalen Stärke des westlichen Elektrojet-Stromes. Werte **über $200\text{ nT}$** deuten auf moderate bis starke Aktivität hin.
             <br>Hinweis: Die Daten werden vom NOAA Space Weather Prediction Center (SWPC) bereitgestellt und am L1-Punkt gemessen. Die Tabelle wird jede Minute automatisch aktualisiert.
         </p>
     </div>
@@ -352,7 +352,8 @@
                 sci = speed * Math.max(0, -bz);
             }
 
-            // 4. Berechnung des Geschätzten AL-Potenzials (nT)
+            // 4. Berechnung des Prognostizierten AL-Potenzials (nT)
+            // HINWEIS: AL ist der Betrag des erwarteten negativen Stroms. Hier zeigen wir den Betrag.
             let estimatedALPotential = 'N/A';
             if (typeof sci === 'number' && !isNaN(sci) && sci >= 0) {
                  estimatedALPotential = sci * AL_SCALING_FACTOR;
@@ -626,7 +627,7 @@
             bzStatusEl.textContent = bzText;
             bzStatusEl.className = `metric-value ${bzColor}`;
 
-            // 4. AL-Potenzial (NEU)
+            // 4. AL-Potenzial (NEU: Prog. AL-Index)
             const alPotential = entry.estimated_al_potential;
             let alText = 'N/A';
             let alColor = 'text-gray-300';
@@ -801,7 +802,7 @@
                     ${bzIcon ? `<span class="mr-1">${bzIcon}</span>` : ''}${safeFormat(bz, 1)}
                 </td>`;
 
-                // Gesch. AL-Potenzial (NEU)
+                // Prognostizierter AL-Index (AKTUALISIERT)
                 row.innerHTML += `<td class="py-3 px-6 text-left ${alColor}">
                     ${alValue}
                 </td>`;
