@@ -233,10 +233,6 @@
         const CRITICAL_BT = 15.0; 
 
         // KONSTANTEN FÜR AL-POTENZIAL
-        // AL (nT) wird oft als lineare Funktion des SCI (V*Bs in V*nT) angenähert.
-        // Die empirischen Korrelationen variieren, aber SCI ist proportional zu der Energiezufuhrrate (Epsilon).
-        // Wir verwenden eine vereinfachte lineare Annäherung, z.B. AL ≈ 0.1 * SCI
-        // Werte über 200 nT gelten als moderate Aktivität.
         const AL_SCALING_FACTOR = 0.1;
         const AL_MODERATE_THRESHOLD = 200; // AL > -200 (da AL negativ ist, entspricht -AL > 200)
         const AL_STRONG_THRESHOLD = 500; // AL > -500
@@ -261,6 +257,17 @@
         const bzStatusEl = document.getElementById('bz-status');
         const alPotentialStatusEl = document.getElementById('al-potential-status'); // Neues Element
 
+        /**
+         * Robuster Parser für NOAA-Daten, um 'null'/'N/A' sicher in Zahlen umzuwandeln.
+         */
+        const safeParseFloat = (value) => {
+            if (typeof value === 'number') return value;
+            if (typeof value === 'string' && (value.toLowerCase() === 'null' || value === 'N/A')) {
+                return NaN;
+            }
+            return parseFloat(value);
+        };
+
 
         // =========================================================================
         // === Allgemeine Hilfsfunktionen ===
@@ -270,7 +277,7 @@
          * Gibt das qualitative Substurm-Risiko basierend auf dem SCI zurück.
          */
         const getSciRiskLevel = (sci) => {
-            if (typeof sci !== 'number' || sci < 0) return 'N/A';
+            if (typeof sci !== 'number' || isNaN(sci) || sci < 0) return 'N/A';
             if (sci >= SCI_WATCH_HIGH) return '🚨 HOCH (> 3500)';
             if (sci >= SCI_WATCH_ELEVATED) return '⚠️ Erhöht (> 2000)';
             if (sci >= SCI_WATCH_LOW) return 'Mittel (> 1000)';
@@ -281,7 +288,7 @@
          * Liefert die kritische Dauer in Stunden (als Zahl) basierend auf dem SCI-Wert.
          */
         const getRequiredBuildupDuration = (sci) => {
-            if (typeof sci !== 'number' || sci < SCI_WATCH_LOW) return SCI_DURATION_LOW_H; 
+            if (typeof sci !== 'number' || isNaN(sci) || sci < SCI_WATCH_LOW) return SCI_DURATION_LOW_H; 
             if (sci >= SCI_WATCH_HIGH) return SCI_DURATION_HIGH_H;
             if (sci >= SCI_WATCH_ELEVATED) return SCI_DURATION_ELEVATED_H;
             return SCI_DURATION_MEDIUM_H; 
@@ -310,23 +317,28 @@
 
         /**
          * Führt die Berechnung aller abgeleiteten Parameter durch
+         * Stellt sicher, dass alle kritischen Felder in Zahlen konvertiert werden
          */
         const calculateDerivedParameters = (entry) => {
-            const speed = parseFloat(entry.speed);
-            const density = parseFloat(entry.density);
-            const bx = parseFloat(entry.bx_nt);
-            const by = parseFloat(entry.by_nt);
-            const bz = parseFloat(entry.bz_nt);
+            // SICHERE NUMERISCHE KONVERTIERUNG DER EINGANGSDATEN
+            const speed = safeParseFloat(entry.speed);
+            const density = safeParseFloat(entry.density);
+            const bx = safeParseFloat(entry.bx_nt);
+            const by = safeParseFloat(entry.by_nt);
+            const bz = safeParseFloat(entry.bz_nt);
             const timeTag = entry.time_tag;
 
             // 1. Berechnung des Magnetischen Totalwerts (Bt)
             let totalBt = 'N/A';
             if (!isNaN(bx) && !isNaN(by) && !isNaN(bz)) {
                 totalBt = Math.sqrt(bx*bx + by*by + bz*bz);
-            } else if (entry.bt_nt && entry.bt_nt !== 'N/A') {
-                 totalBt = parseFloat(entry.bt_nt);
+            } else {
+                 const btRaw = safeParseFloat(entry.bt_nt);
+                 if (!isNaN(btRaw)) {
+                     totalBt = btRaw;
+                 }
             }
-
+            
             // 2. Berechnung des Dynamischen Drucks (nPa)
             let dynamicPressure = 'N/A';
             if (!isNaN(speed) && speed > 0 && !isNaN(density) && density >= 0) {
@@ -341,12 +353,8 @@
             }
 
             // 4. Berechnung des Geschätzten AL-Potenzials (nT)
-            // Empirisch wird der AL-Index oft als eine Funktion der Energiekopplungsrate P_sub (oder SCI) gesehen.
-            // Die Stärke des Western Electrojet (AL) skaliert ungefähr mit der Energiezufuhr.
             let estimatedALPotential = 'N/A';
-            if (typeof sci === 'number' && sci >= 0) {
-                 // Einfache lineare Annäherung: AL_Potential (nT) ≈ C * SCI
-                 // Der AL-Index ist negativ. Das "Potenzial" wird hier als positiver Wert (-AL) dargestellt.
+            if (typeof sci === 'number' && !isNaN(sci) && sci >= 0) {
                  estimatedALPotential = sci * AL_SCALING_FACTOR;
             }
 
@@ -378,14 +386,21 @@
                 estimatedOnset = new Date(arrivalDate.getTime() + durationMs);
             }
 
+            // Rückgabe des Eintrags mit den überschriebenen numerischen Werten (oder 'N/A')
             return {
-                ...entry,
-                dynamic_pressure_npa: dynamicPressure,
-                substorm_coupling_index: sci, 
-                estimated_al_potential: estimatedALPotential, // NEU
+                time_tag: timeTag,
+                speed: isNaN(speed) ? 'N/A' : speed,
+                density: isNaN(density) ? 'N/A' : density,
+                bz_nt: isNaN(bz) ? 'N/A' : bz,
+                bx_nt: isNaN(bx) ? 'N/A' : bx,
+                by_nt: isNaN(by) ? 'N/A' : by,
+                total_bt: typeof totalBt === 'number' ? totalBt : 'N/A',
+                
+                dynamic_pressure_npa: typeof dynamicPressure === 'number' ? dynamicPressure : 'N/A',
+                substorm_coupling_index: typeof sci === 'number' ? sci : 'N/A', 
+                estimated_al_potential: typeof estimatedALPotential === 'number' ? estimatedALPotential : 'N/A', 
                 sci_risk_level: sciRiskLevel, 
                 critical_buildup_duration_h: criticalBuildupDuration, 
-                total_bt: totalBt, 
                 travel_time_h: travelTimeHours,
                 travel_time_m: travelTimeMinutes, 
                 travel_time_ms: travelTimeMs,
@@ -402,7 +417,6 @@
          * Erstellt die Chart.js-Instanz initial.
          */
         const createChart = () => {
-            // Sicherstellen, dass Chart.js geladen ist
              if (typeof Chart === 'undefined') {
                 console.error("Chart.js ist nicht definiert. Kann das Diagramm nicht erstellen.");
                 return;
@@ -503,7 +517,8 @@
                 // Geschwindigkeit (Speed)
                 {
                     label: 'Geschw. (km/s)',
-                    data: data.map(d => parseFloat(d.speed)),
+                    // Verwende den nummerischen Wert, filtere "N/A" (NaN)
+                    data: data.map(d => typeof d.speed === 'number' ? d.speed : NaN), 
                     borderColor: '#ff7b72', // Rot-Ton
                     backgroundColor: 'rgba(255, 123, 114, 0.2)',
                     yAxisID: 'yPlasma',
@@ -513,7 +528,7 @@
                 // Dichte (Density)
                 {
                     label: 'Dichte (p/cm³)',
-                    data: data.map(d => parseFloat(d.density)),
+                    data: data.map(d => typeof d.density === 'number' ? d.density : NaN),
                     borderColor: '#f97316', // Orange-Ton
                     backgroundColor: 'rgba(249, 115, 22, 0.2)',
                     yAxisID: 'yPlasma',
@@ -533,12 +548,12 @@
                 // Bz
                 {
                     label: 'Bz (nT)',
-                    data: data.map(d => parseFloat(d.bz_nt)),
+                    data: data.map(d => typeof d.bz_nt === 'number' ? d.bz_nt : NaN),
                     borderColor: '#e83966', // Magenta-Ton (für kritischen Bz)
                     backgroundColor: 'rgba(232, 57, 102, 0.2)',
                     yAxisID: 'yMag',
                     tension: 0.2,
-                    pointRadius: 2, // Bz ist kritischer, daher etwas größerer Punkt
+                    pointRadius: 2, 
                 }
             ];
 
@@ -588,11 +603,11 @@
             arrivalTimeStatusEl.className = `metric-value ${arrivalColor}`;
 
             // 3. Bz-Komponente
-            const bz = parseFloat(entry.bz_nt);
+            const bz = entry.bz_nt; // Ist jetzt Nummer oder 'N/A'
             let bzText = 'N/A';
             let bzColor = 'text-gray-300';
             
-            if (!isNaN(bz)) {
+            if (typeof bz === 'number') {
                 bzText = `${bz.toFixed(1)} nT`;
                 if (bz < -5) { 
                     bzColor = 'text-red-400 font-extrabold';
@@ -636,6 +651,12 @@
         // =========================================================================
         // === Tabellen- und UI-Logik (Erweitert) ===
         // =========================================================================
+        
+        // Hilfsfunktion zum sicheren Formatieren von Zahlen (vermeidet toFixed auf 'N/A'/'null')
+        const safeFormat = (value, precision = 1) => {
+            return typeof value === 'number' ? value.toFixed(precision) : String(value);
+        };
+
 
         /**
          * Rendert die Daten in die HTML-Tabelle
@@ -670,8 +691,8 @@
                 // --- Bz (Magnetfeld) Verbesserungen ---
                 let bzColor = 'text-gray-300';
                 let bzIcon = '';
-                const bz = parseFloat(entry.bz_nt);
-                if (!isNaN(bz)) {
+                const bz = entry.bz_nt; // IST JETZT ZAHL ODER 'N/A'
+                if (typeof bz === 'number') {
                     if (bz < -5) { 
                         bzColor = 'text-red-400 font-bold';
                         bzIcon = '⬇️'; 
@@ -689,18 +710,20 @@
 
                 // Farben für die Geschwindigkeit
                 let speedColor = 'text-green-400';
-                const speed = parseFloat(entry.speed);
-                if (speed > 550) {
-                    speedColor = 'text-red-400 font-bold';
-                } else if (speed > 450) {
-                    speedColor = 'text-yellow-400';
+                const speed = entry.speed; // IST JETZT ZAHL ODER 'N/A'
+                if (typeof speed === 'number') {
+                    if (speed > 550) {
+                        speedColor = 'text-red-400 font-bold';
+                    } else if (speed > 450) {
+                        speedColor = 'text-yellow-400';
+                    }
                 }
 
                 // --- Dyn. Druck Hervorhebung und Kompression ---
                 let pressureColor = 'text-gray-300';
                 let compressionIcon = '';
                 const pressure = entry.dynamic_pressure_npa;
-                const density = parseFloat(entry.density);
+                const density = entry.density; // IST JETZT ZAHL ODER 'N/A'
 
                 if (typeof pressure === 'number') {
                     if (pressure > CRITICAL_PRESSURE_NPA) {
@@ -713,7 +736,7 @@
                 }
 
                 // Kompressions-Indikator
-                if (!isNaN(density) && density >= CRITICAL_DENSITY && typeof pressure === 'number' && pressure > 5.0) {
+                if (typeof density === 'number' && density >= CRITICAL_DENSITY && typeof pressure === 'number' && pressure > 5.0) {
                     pressureColor = 'text-yellow-300 font-extrabold'; 
                     compressionIcon = '💥 STAU!'; 
                 }
@@ -757,26 +780,25 @@
                     }
                 }
                 
-                const sciValue = typeof sci === 'number' ? sci.toFixed(0) : String(sci);
-                const alValue = typeof alPotential === 'number' ? alPotential.toFixed(0) : String(alPotential);
+                const sciValue = safeFormat(sci, 0);
+                const alValue = safeFormat(alPotential, 0);
                 
                 row.innerHTML += `<td class="py-3 px-6 text-left">${formatTime(parseUtcTimeTag(entry.time_tag))}</td>`;
-                row.innerHTML += `<td class="py-3 px-6 text-left ${speedColor}">${parseFloat(entry.speed).toFixed(1)}</td>`;
-                row.innerHTML += `<td class="py-3 px-6 text-left">${parseFloat(entry.density).toFixed(2)}</td>`;
+                // SICHERE ANZEIGE: Nutze safeFormat für alle Zahlenspalten
+                row.innerHTML += `<td class="py-3 px-6 text-left ${speedColor}">${safeFormat(entry.speed, 1)}</td>`;
+                row.innerHTML += `<td class="py-3 px-6 text-left">${safeFormat(entry.density, 2)}</td>`;
                 
                 // Dynamischer Druck Zelle
-                const pressureValue = typeof pressure === 'number' ? pressure.toFixed(2) : String(pressure);
                 row.innerHTML += `<td class="py-3 px-6 text-left ${pressureColor}">
-                    ${compressionIcon ? `<span class="mr-1">${compressionIcon}</span>` : ''}${pressureValue}
+                    ${compressionIcon ? `<span class="mr-1">${compressionIcon}</span>` : ''}${safeFormat(pressure, 2)}
                 </td>`;
                 
                 // Total Bt Zelle
-                const totalBtValue = typeof totalBt === 'number' ? totalBt.toFixed(1) : String(totalBt);
-                row.innerHTML += `<td class="py-3 px-6 text-left ${btColor}">${totalBtValue}</td>`;
+                row.innerHTML += `<td class="py-3 px-6 text-left ${btColor}">${safeFormat(totalBt, 1)}</td>`;
                 
                 // Bz (nT)
                 row.innerHTML += `<td class="py-3 px-6 text-left ${bzColor}">
-                    ${bzIcon ? `<span class="mr-1">${bzIcon}</span>` : ''}${parseFloat(entry.bz_nt).toFixed(1)}
+                    ${bzIcon ? `<span class="mr-1">${bzIcon}</span>` : ''}${safeFormat(bz, 1)}
                 </td>`;
 
                 // Gesch. AL-Potenzial (NEU)
@@ -886,12 +908,12 @@
         const sortData = () => {
             const keyMap = {
                 'time_tag': d => parseUtcTimeTag(d.time_tag).getTime(),
-                'speed': d => parseFloat(d.speed) || -Infinity,
-                'density': d => parseFloat(d.density) || -Infinity,
+                'speed': d => typeof d.speed === 'number' ? d.speed : -Infinity,
+                'density': d => typeof d.density === 'number' ? d.density : -Infinity,
                 'dynamic_pressure_npa': d => typeof d.dynamic_pressure_npa === 'number' ? d.dynamic_pressure_npa : -Infinity,
                 'total_bt': d => typeof d.total_bt === 'number' ? d.total_bt : -Infinity,
-                'bz_nt': d => parseFloat(d.bz_nt) || -Infinity,
-                'estimated_al_potential': d => typeof d.estimated_al_potential === 'number' ? d.estimated_al_potential : -Infinity, // NEU
+                'bz_nt': d => typeof d.bz_nt === 'number' ? d.bz_nt : -Infinity,
+                'estimated_al_potential': d => typeof d.estimated_al_potential === 'number' ? d.estimated_al_potential : -Infinity,
                 'substorm_coupling_index': d => typeof d.substorm_coupling_index === 'number' ? d.substorm_coupling_index : -Infinity,
                 'estimated_onset_time': d => d.estimated_onset_time instanceof Date ? d.estimated_onset_time.getTime() : Infinity,
                 'sci_risk_level': d => typeof d.substorm_coupling_index === 'number' ? d.substorm_coupling_index : -Infinity, 
@@ -909,35 +931,50 @@
                     comparison = -1;
                 }
 
-                // Ausnahme: ASC für Sturmbeginn (kürzer/früher ist bald)
-                const isAscendingSort = sortDirection === 'asc' || 
-                                        sortColumn === 'estimated_onset_time';
+                // Standardmäßig ASC, außer bei Zeitstempel
+                let finalComparison = comparison;
+                if (sortDirection === 'desc' && sortColumn !== 'time_tag') {
+                     finalComparison = comparison * -1;
+                }
                 
-                // Für Bz und AL-Potential ist DESC die kritischere Richtung (negativ/hoch positiv zuerst)
+                // Spezielle Logik für kritische Spalten (bz, AL, SCI): Immer DESC (höchste Aktivität zuerst)
                 if (sortColumn === 'bz_nt') {
-                    // Bz: Größere NEGATIVE Zahl ist kritischer. Daher DESC (negativ zuerst)
-                    return sortDirection === 'asc' ? comparison : comparison * -1;
+                    // Bz: Größere NEGATIVE Zahl ist kritischer. Daher ASC (d.h. -10 kommt vor -5)
+                    finalComparison = comparison; 
                 }
                 if (sortColumn === 'estimated_al_potential' || sortColumn === 'substorm_coupling_index') {
                     // AL-Potenzial/SCI: Größere positive Zahl ist kritischer. Daher DESC (hoch zuerst)
-                    return sortDirection === 'asc' ? comparison : comparison * -1;
+                    finalComparison = comparison * -1;
+                }
+                // Für time_tag ist DESC der Standard (neueste zuerst)
+                if (sortColumn === 'time_tag') {
+                    finalComparison = comparison * -1;
                 }
 
 
-                return isAscendingSort ? comparison : comparison * -1;
+                return finalComparison;
             });
 
             document.querySelectorAll('[data-sort-icon]').forEach(icon => icon.textContent = '');
             const currentIcon = document.querySelector(`[data-sort-icon="${sortColumn}"]`);
             if (currentIcon) {
-                // Anzeige der Sortierrichtung
                 currentIcon.textContent = sortDirection === 'asc' ? '↑' : '↓';
+                // Bz und AL/SCI haben eine feste visuelle Sortierrichtung
+                if (sortColumn === 'bz_nt' || sortColumn === 'estimated_al_potential' || sortColumn === 'substorm_coupling_index') {
+                    currentIcon.textContent = '↓';
+                }
+                // Zeit ist immer DESC (neueste zuerst)
+                 if (sortColumn === 'time_tag') {
+                    currentIcon.textContent = '↓';
+                }
             }
-            // Standardmäßig nach Zeit absteigend sortieren
+            
+            // Standardmäßig nach Zeit absteigend sortieren, wenn die Seite das erste Mal lädt
             if (sortColumn === 'time_tag') {
                 const defaultIcon = document.querySelector(`[data-sort-icon="time_tag"]`);
                 defaultIcon.textContent = '↓';
             }
+
 
             renderTable(allData);
         };
@@ -951,6 +988,7 @@
                 throw new Error(`HTTP-Fehler beim Laden von ${url}: ${response.status}`);
             }
             const rawData = await response.json();
+            // Die erste Zeile enthält Header, daher .slice(1)
             return rawData.slice(1);
         };
 
@@ -980,15 +1018,12 @@
                 const magMap = new Map();
                 magDataRaw.forEach(row => {
                     const timeTag = row[MAG_TIME_INDEX];
-                    // Stellen Sie sicher, dass Magnetfelddaten vorhanden sind
-                    if (row[MAG_BX_INDEX] !== 'null' && row[MAG_BY_INDEX] !== 'null' && row[MAG_BZ_INDEX] !== 'null') {
-                        magMap.set(timeTag, {
-                            bx_nt: row[MAG_BX_INDEX],
-                            by_nt: row[MAG_BY_INDEX],
-                            bz_nt: row[MAG_BZ_INDEX],
-                            bt_nt: row[MAG_BT_INDEX] || 'N/A'
-                        });
-                    }
+                    magMap.set(timeTag, {
+                        bx_nt: row[MAG_BX_INDEX] || 'N/A',
+                        by_nt: row[MAG_BY_INDEX] || 'N/A',
+                        bz_nt: row[MAG_BZ_INDEX] || 'N/A',
+                        bt_nt: row[MAG_BT_INDEX] || 'N/A'
+                    });
                 });
 
                 const processedData = plasmaDataRaw.map(row => {
@@ -997,14 +1032,15 @@
                     
                     const entry = {
                         time_tag: timeTag,
-                        density: row[1],
-                        speed: row[2],
+                        // Plasma Data Indices: 1=Density, 2=Speed
+                        density: row[1] || 'N/A',
+                        speed: row[2] || 'N/A',
                         bx_nt: magEntry.bx_nt, 
                         by_nt: magEntry.by_nt,
                         bz_nt: magEntry.bz_nt,
                         bt_nt: magEntry.bt_nt,
                     };
-                    return calculateDerivedParameters(entry); // Geänderter Funktionsaufruf
+                    return calculateDerivedParameters(entry); 
                 });
 
                 if (processedData.length > 0) {
@@ -1019,13 +1055,18 @@
                     const latestTimeMs = parseUtcTimeTag(latestEntry.time_tag).getTime();
                     const cutoffTimeMs = latestTimeMs - TWO_HOURS_MS;
 
+                    // Filterung auf die letzten 2 Stunden
                     allData = processedData.filter(entry => {
                         const entryTimeMs = parseUtcTimeTag(entry.time_tag).getTime();
                         return entryTimeMs >= cutoffTimeMs;
                     });
                     
+                    // Überprüfung, ob nach Filterung noch Daten vorhanden sind
+                     if (allData.length === 0) {
+                        throw new Error('Keine Daten in den letzten 2 Stunden gefunden.');
+                    }
+                    
                     // --- LOGIK FÜR DAS DIAGRAMM ---
-                    // Chronologisch sortierte Daten für das Diagramm (älteste zuerst)
                     const chartData = [...allData].sort((a, b) => 
                         parseUtcTimeTag(a.time_tag).getTime() - parseUtcTimeTag(b.time_tag).getTime()
                     );
@@ -1038,16 +1079,14 @@
 
                 } else {
                     allData = [];
-                    statusMessage.textContent = 'Daten erfolgreich geladen, aber keine Einträge in den letzten 2 Stunden gefunden.';
-                    statusMessage.classList.remove('hidden', 'bg-red-900', 'bg-green-900/50');
-                    statusMessage.classList.add('bg-yellow-900', 'text-yellow-400');
+                    throw new Error('Es wurden keine gültigen Daten vom Server empfangen.');
                 }
 
-                sortData();
+                sortData(); // Stellt die Anzeige nach dem Laden sicher
 
             } catch (error) {
-                console.error("Fehler beim Abrufen der Daten:", error);
-                statusMessage.textContent = `Fehler beim Laden der Daten: ${error.message}. Nächste Aktualisierung in 1 Minute.`;
+                console.error("Fehler beim Abrufen/Verarbeiten der Daten:", error);
+                statusMessage.textContent = `Fehler beim Laden oder Verarbeiten der Daten: ${error.message}. Nächste Aktualisierung in 1 Minute.`;
                 statusMessage.classList.remove('hidden', 'bg-green-900/50', 'bg-yellow-900');
                 statusMessage.classList.add('bg-red-900', 'text-red-400');
             } finally {
@@ -1059,13 +1098,10 @@
          * Startet den initialen Ladevorgang und richtet den Auto-Refresh-Intervall ein.
          */
         const startApp = () => {
-             // SICHERSTELLEN, DASS PLUGINS UND ADAPTER REGISTRIERT SIND
             if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
                 Chart.register(ChartZoom);
-                console.log("Chart.js Zoom Plugin explizit registriert.");
             }
             
-            // Initialisiert das Chart-Element (erfordert den Date-Adapter)
             createChart(); 
 
             headers.forEach(header => {
@@ -1075,10 +1111,11 @@
                         sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
                     } else {
                         sortColumn = key;
-                        
-                        // Setze Standard-Sortierrichtung für neue Spalten
-                        if (key === 'estimated_onset_time' || key === 'bz_nt') {
-                            sortDirection = 'asc'; 
+                        // Standard Sortierrichtung basierend auf Kritikalität
+                        if (key === 'bz_nt' || key === 'estimated_al_potential' || key === 'substorm_coupling_index') {
+                            sortDirection = 'desc'; // Kritische Werte (negativ/hoch) zuerst
+                        } else if (key === 'estimated_onset_time') {
+                             sortDirection = 'asc'; // Frühester Zeitpunkt zuerst
                         } else {
                             sortDirection = 'desc'; 
                         }
