@@ -1,288 +1,948 @@
-<!--
-  Titel: Solarwind- & Geomagnetische Analyse
-  Beschreibung: Web-App zur Anzeige von Echtzeit-Solarwinddaten (NOAA) und zur Prognose geomagnetischer Störungen (Substorm Coupling Index / AL-Index).
-  Technologie: HTML5, Tailwind CSS, Vanilla JavaScript
--->
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solarwind- & Geomagnetische Analyse</title>
-    <!-- Lade Tailwind CSS -->
+    <title>Solarwind-Plasma-Daten und Substurm-Kopplungsindex</title>
+    <!-- Tailwind CSS laden -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Setze eine angenehme Schriftart */
+        /* Spezifische Schriftart */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f7f9fc;
+            background-color: #0d1117; /* Dunkler Hintergrund */
+            color: #c9d1d9; /* Heller Text */
         }
-        /* Definiere einfache, durchgehende Farben für die Statuskarten */
-        .status-card {
-            transition: all 0.3s ease;
+        .header-cell {
+            cursor: pointer;
+            transition: background-color 0.2s;
         }
-        /* Stil für den Ladeindikator */
-        #loading-indicator {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100px;
-            font-weight: 600;
-            color: #4a5568;
+        .header-cell:hover {
+            background-color: #21262d;
         }
-        /* Animations-Keyframes für den Lade-Spinner */
+        .loading-animation {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #58a6ff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
-        .spinner {
-            border-top-color: #3b82f6;
-            animation: spin 1s ease-in-out infinite;
+
+        /* HIGHTLIGHT-KLASSE: Markiert Daten, deren Ankunft theoretisch bereits erfolgt ist */
+        .highlight-row {
+            background-color: #1a222e; /* Dunkler, dezenter Blauton */
+            border-left: 4px solid #3b82f6; /* Subtiler blauer Rand */
+        }
+        .highlight-row:hover {
+            background-color: #242c38 !important;
+        }
+        .substorm-watch-high {
+            background-color: #450a0a !important; /* Dunkelrot */
+            border-left: 4px solid #ef4444 !important;
+            font-weight: bold;
+        }
+        .substorm-watch-elevated {
+            background-color: #422006 !important; /* Dunkelorange */
+            border-left: 4px solid #f97316 !important;
+        }
+        .status-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+        .status-metric {
+            background-color: #161b22;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #30363d;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 1.875rem; /* text-3xl */
+            font-weight: 800; /* font-extrabold */
         }
     </style>
 </head>
 <body class="p-4 md:p-8">
 
     <div class="max-w-7xl mx-auto">
-        <h1 class="text-3xl font-extrabold text-gray-900 mb-2">Solarwind-Dashboard (Echtzeit-Daten)</h1>
-        <p id="last-updated" class="text-sm text-gray-500 mb-6">Daten werden geladen...</p>
+        <h1 class="text-3xl md:text-4xl font-extrabold mb-2 text-blue-400">
+            Solarwind-Plasma-Daten (L1-Punkt)
+        </h1>
+        <p class="text-lg mb-6 text-gray-400">
+            Daten der NOAA SWPC (Plasma und Magnetfeld) mit berechneter geschätzter Ankunftszeit und Substurm-Kopplungsindex.
+        </p>
 
-        <!-- Statuskarten-Container -->
-        <div id="status-container" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <!-- Karten werden hier dynamisch eingefügt -->
-        </div>
-
-        <!-- Daten-Tabelle -->
-        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">Solarwind-Messungen (Letzte 2 Stunden)</h2>
-            <div id="loading-indicator" class="hidden">
-                <div class="spinner border-4 border-gray-200 border-t-4 rounded-full w-8 h-8 mr-3"></div>
-                Daten werden von NOAA geladen...
+        <!-- Echtzeit-Statuskarte (Zeigt die Auswirkung des L1-Pakets) -->
+        <div id="current-status-card" class="mb-8 status-card-grid">
+            <div class="status-metric">
+                <p class="text-sm uppercase text-gray-400">Neuster Messwert (L1)</p>
+                <p id="latest-time-tag" class="metric-value text-gray-300">-</p>
             </div>
-            <div class="overflow-x-auto">
-                <table id="data-table" class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Zeit (UTC)</th>
-                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Geschw. (km/s)</th>
-                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dichte (p/cc)</th>
-                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bt (nT)</th>
-                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bz (nT)</th>
-                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">T-Diff (°C)</th>
-                            <th class="px-3 py-3 text-left text-xs font-medium text-green-600 uppercase tracking-wider">Prog. AL-Index (nT)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="data-table-body" class="bg-white divide-y divide-gray-200">
-                        <!-- Datenzeilen werden hier eingefügt -->
-                    </tbody>
-                </table>
+            <div class="status-metric">
+                <p class="text-sm uppercase text-gray-400">Gesch. Ankunft (Erde)</p>
+                <p id="arrival-time-status" class="metric-value text-blue-400">-</p>
+            </div>
+            <div class="status-metric">
+                <p class="text-sm uppercase text-gray-400">Prog. AL-Index (nT)</p>
+                <p id="al-index-status" class="metric-value text-gray-300">-</p>
+            </div>
+            <div class="status-metric">
+                <p class="text-sm uppercase text-gray-400">Substurm-Risiko (SCI)</p>
+                <p id="sci-risk-status" class="metric-value text-gray-300">-</p>
             </div>
         </div>
         
-        <!-- Erklärung zum Prognostizierten AL-Index -->
-        <div class="mt-8 p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-800 rounded-lg">
-            <p class="font-semibold">Was ist der "Prog. AL-Index (nT)"?</p>
-            <p class="text-sm mt-1">
-                Dieser Wert ist eine schnelle Schätzung des **AL-Index (Auroral Lower)**, basierend auf dem Substorm Coupling Index (SCI). Der AL-Index quantifiziert die Stärke des Auroralen Elektrojetstroms und ist ein direkter Indikator für geomagnetische Substorm-Aktivität und Polarlichter. Ein **negativer, größerer** Wert (z. B. -500 nT) deutet auf eine erhöhte Substorm-Gefahr hin.
-            </p>
+        <!-- Status- und Ladeanzeige -->
+        <div id="status-message" class="text-center p-4 my-4 bg-gray-800 rounded-lg shadow-lg hidden"></div>
+        <div id="loading-indicator" class="flex justify-center items-center p-8">
+            <div class="loading-animation"></div>
+            <span class="ml-4 text-xl text-blue-400">Daten werden geladen...</span>
         </div>
+
+        <!-- Tabelle für die Daten -->
+        <div id="data-container" class="overflow-x-auto">
+            <table id="plasma-table" class="min-w-full bg-gray-800 rounded-lg shadow-2xl hidden">
+                <thead>
+                    <tr class="bg-blue-600/80 text-white uppercase text-sm leading-normal">
+                        <!-- Plasmadaten & Zeiten -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="time_tag">
+                            Messzeitpunkt (L1)
+                            <span data-sort-icon="time_tag" class="ml-1">↓</span>
+                        </th>
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="speed">
+                            Geschw. (km/s)
+                            <span data-sort-icon="speed" class="ml-1"></span>
+                        </th>
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="density">
+                            Dichte (p/cm³)
+                            <span data-sort-icon="density" class="ml-1"></span>
+                        </th>
+                        <!-- Dynamischer Druck -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="dynamic_pressure_npa">
+                            Dyn. Druck (nPa)
+                            <span data-sort-icon="dynamic_pressure_npa" class="ml-1"></span>
+                        </th>
+                        <!-- Magnetfelddaten -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="total_bt">
+                            Total Bt (nT)
+                            <span data-sort-icon="total_bt" class="ml-1"></span>
+                        </th>
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="bz_nt">
+                            Bz (nT)
+                            <span data-sort-icon="bz_nt" class="ml-1"></span>
+                        </th>
+                         <!-- Prog. AL-Index NEUE SPALTE -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="prog_al_index">
+                            Prog. AL-Index (nT)
+                            <span data-sort-icon="prog_al_index" class="ml-1"></span>
+                        </th>
+                        <!-- SCI -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="substorm_coupling_index">
+                            ⚡ SCI (V·Bs)
+                            <span data-sort-icon="substorm_coupling_index" class="ml-1"></span>
+                        </th>
+                        <!-- Geschätzte Sturmbeginn-Zeit -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="estimated_onset_time">
+                            Gesch. Sturmbeginn (UTC)
+                            <span data-sort-icon="estimated_onset_time" class="ml-1"></span>
+                        </th>
+                        <!-- Substurm-Risiko -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="sci_risk_level">
+                            Risiko-Level
+                            <span data-sort-icon="sci_risk_level" class="ml-1"></span>
+                        </th>
+                        <!-- Ankunftszeit -->
+                        <th class="py-3 px-6 text-left header-cell" data-sort-key="arrival_time">
+                            Gesch. Ankunftszeit (Erde)
+                            <span data-sort-icon="arrival_time" class="ml-1"></span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="table-body" class="text-gray-300 text-sm font-light">
+                    <!-- Daten werden hier durch JavaScript eingefügt -->
+                </tbody>
+            </table>
+        </div>
+
+        <p class="mt-6 text-xs text-gray-500">
+            <span class="font-bold text-blue-400">Hervorgehobene Zeilen</span> (blaue Markierung) sind bereits auf der Erde **angekommen**.<br>
+            <span class="font-bold text-pink-400">Prog. AL-Index (nT)</span>: **Prognostizierter Auroral Lower Index.** Dieser Index quantifiziert die Stärke des Auroralen Elektrojets. Ein **negativer, größerer** Wert (z. B. $<-500\text{ nT}$) deutet auf eine **hohe Substorm-Aktivität** hin. <br>
+            <span class="font-bold text-blue-300">🔜</span> in der Ankunftszeit: Der Solarwind wird **innerhalb der nächsten 30 Minuten** erwartet.<br>
+            <span class="font-bold text-pink-400">🏎️ ÜBERHOLT!</span>: Ein später gemessener Plasmaabschnitt wird **früher** erwartet, was auf eine **Geschwindigkeitsfront** hindeutet.<br>
+            <span class="font-bold text-yellow-300">Total Bt (nT)</span>: Der **Gesamtwert** des Magnetfelds. Werte **über $15\text{ nT}$** sind hoch (oft assoziiert mit Stoßwellen).
+            <br><span class="font-bold text-red-400">⬇️ Bz</span>: Zeigt die **Südrichtung** des Magnetfelds an, ein kritischer Indikator für geomagnetische Aktivität und Substürme. **(Dies ist die wichtigste Information, die einem Boden-Magnetometer-Index vorausgeht)**<br>
+            <span class="font-bold text-yellow-300">💥 STAU! Dyn. Druck</span>: Zeigt eine **starke Kompressionszone (SIR/Stoßwelle)** an (Dichte > $15\text{ p/cm}^3$ und Druck > $5\text{ nPa}$).<br>
+            <span class="font-bold text-red-400">Dyn. Druck (nPa)</span>: Werte **über $10\text{ nPa}$** sind stark erhöht und deuten auf eine erhebliche Magnetosphären-Kompression hin.<br>
+            <span class="font-bold text-red-400">🚨 SCI (V·Bs)</span>: Hohe Werte (**> 3500**) signalisieren ein **hohes Potenzial für Substürme** (starke Polarlichter).
+            <br><span class="font-bold text-red-300">⚠️ Gesch. Sturmbeginn</span>: Die **geschätzte früheste Zeit** für den **Beginn des geomagnetischen Sturms** (Ankunft + Aufbauzeit).
+            <br>Hinweis: Die Daten werden vom NOAA Space Weather Prediction Center (SWPC) bereitgestellt und am L1-Punkt gemessen. Die Tabelle wird jede Minute automatisch aktualisiert.
+        </p>
     </div>
 
     <script type="module">
-        const NOAA_API_URL = 'https://services.swpc.noaa.gov/products/solar-wind/plasma-6-hour.json';
-        const apiKey = ""; // API-Schlüssel wird für die NOAA-Daten nicht benötigt
+        // --- Anwendungskonstanten ---
+        const PLASMA_API_URL = 'https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json';
+        const MAG_API_URL = 'https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json';
+        
+        const L1_DISTANCE_KM = 1500000;
+        const MS_PER_SEC = 1000;
+        const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+        const THIRTY_MINUTES_MS = 30 * 60 * 1000;
+        const REFRESH_INTERVAL_MS = 60 * 1000;
+        
+        // Konstante für die Berechnung des Dynamischen Drucks in nPa
+        const DYNAMIC_PRESSURE_FACTOR = 0.001672;
+        const CRITICAL_PRESSURE_NPA = 10.0;
+        const CRITICAL_DENSITY = 15.0;
 
-        // Definierte Schwellenwerte für die Einfärbung
-        const thresholds = {
-            speed: { normal: 400, high: 600, unit: 'km/s' },
-            density: { normal: 5, high: 15, unit: 'p/cc' },
-            bt: { normal: 8, high: 15, unit: 'nT' },
-            bz: { normal: 0, critical: -5, unit: 'nT' }, // Bz-Werte sind negativ für geomagnetische Stürme
-            al_index: { normal: -50, high: -200, critical: -500, unit: 'nT' }, // AL-Index ist negativ
-            tdiff: { normal: 50000, high: 100000, unit: '°C' } // Temperaturdifferenz (könnte in Kelvin oder Joule/K sein, aber wir verwenden °C für eine vereinfachte Darstellung)
+        // KONSTANTEN FÜR SUBSTORM COUPLING INDEX (SCI)
+        const SCI_WATCH_LOW = 1000; 
+        const SCI_WATCH_ELEVATED = 2000; 
+        const SCI_WATCH_HIGH = 3500; 
+        
+        // KONSTANTEN FÜR KRITISCHE AUFBAUZEIT (WERTE WERDEN IM CODE NOCH VERWENDET)
+        const SCI_DURATION_HIGH_H = 1.75; 
+        const SCI_DURATION_ELEVATED_H = 2.5;
+        const SCI_DURATION_MEDIUM_H = 3.0;
+        const SCI_DURATION_LOW_H = 100.0; 
+        const CRITICAL_BT = 15.0; 
+        
+        // Konstanten für AL-Index-Bewertung
+        const AL_INDEX_CRITICAL_NT = -500;
+        const AL_INDEX_ELEVATED_NT = -200;
+
+
+        // --- DOM-Elemente ---
+        const tableBody = document.getElementById('table-body');
+        const plasmaTable = document.getElementById('plasma-table');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const statusMessage = document.getElementById('status-message');
+        const headers = document.querySelectorAll('.header-cell');
+
+        // Statuskarten-Elemente
+        const latestTimeTagEl = document.getElementById('latest-time-tag');
+        const arrivalTimeStatusEl = document.getElementById('arrival-time-status');
+        const alIndexStatusEl = document.getElementById('al-index-status'); // NEU: AL-Index Status
+        const sciRiskStatusEl = document.getElementById('sci-risk-status');
+
+
+        let allData = [];
+        let sortColumn = 'time_tag';
+        let sortDirection = 'desc';
+
+        // =========================================================================
+        // === Allgemeine Hilfsfunktionen ===
+        // =========================================================================
+        
+        /**
+         * Gibt das qualitative Substurm-Risiko basierend auf dem SCI zurück.
+         */
+        const getSciRiskLevel = (sci) => {
+            if (typeof sci !== 'number' || sci < 0) return 'N/A';
+            if (sci >= SCI_WATCH_HIGH) return '🚨 HOCH (> 3500)';
+            if (sci >= SCI_WATCH_ELEVATED) return '⚠️ Erhöht (> 2000)';
+            if (sci >= SCI_WATCH_LOW) return 'Mittel (> 1000)';
+            return 'Gering';
         };
 
-        // Hilfsfunktion zur Ermittlung der Tailwind-Klasse basierend auf dem Wert und den Schwellenwerten
-        function getStatusClass(key, value) {
-            const t = thresholds[key];
-            
-            // Sonderbehandlung für den Bz-Index (Südwärts ist kritisch)
-            if (key === 'bz') {
-                if (value <= t.critical) return 'bg-red-500 text-white';
-                if (value < t.normal) return 'bg-yellow-400 text-gray-800'; // Negativ, aber nicht kritisch
-                return 'bg-green-500 text-white'; // Positiv (Nordwärts)
-            }
-            
-            // Sonderbehandlung für den AL-Index (Negativer Wert ist kritisch)
-            if (key === 'al_index') {
-                if (value <= t.critical) return 'bg-red-500 text-white'; // z.B. -500 oder kleiner (negativer)
-                if (value <= t.high) return 'bg-orange-400 text-white'; // z.B. -200 bis -500
-                if (value <= t.normal) return 'bg-yellow-400 text-gray-800'; // z.B. -50 bis -200
-                return 'bg-green-500 text-white'; // Nahe 0
+        /**
+         * Liefert die kritische Dauer in Stunden (als Zahl) basierend auf dem SCI-Wert.
+         * Diese Funktion wird weiterhin benötigt, um die "Gesch. Sturmbeginn"-Zeit zu berechnen.
+         */
+        const getRequiredBuildupDuration = (sci) => {
+            if (typeof sci !== 'number' || sci < SCI_WATCH_LOW) return SCI_DURATION_LOW_H; 
+            if (sci >= SCI_WATCH_HIGH) return SCI_DURATION_HIGH_H;
+            if (sci >= SCI_WATCH_ELEVATED) return SCI_DURATION_ELEVATED_H;
+            return SCI_DURATION_MEDIUM_H; 
+        };
+
+        /**
+         * Konvertiert den NOAA-Zeitstempel-String in ein UTC-Date-Objekt
+         */
+        const parseUtcTimeTag = (timeTag) => {
+            return new Date(timeTag.replace(' ', 'T') + 'Z');
+        };
+
+        /**
+         * Formatiert Zeitstempel mit Datum und Uhrzeit
+         */
+        const formatTime = (date) => {
+            if (!(date instanceof Date) || isNaN(date)) return 'N/A';
+            const options = {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false,
+                timeZone: 'UTC'
+            };
+            return date.toLocaleString('de-DE', options) + ' UTC';
+        };
+
+        /**
+         * NEU: Berechnung des Prognostizierten AL-Index (Auroral Lower Index)
+         * Vereinfachtes Modell basierend auf SCI und Bz/Bt-Verhältnissen.
+         */
+        const calculateProgALIndex = (sci, totalBt, bz) => {
+            if (typeof sci !== 'number' || isNaN(sci) || sci <= 0 || typeof totalBt !== 'number' || isNaN(totalBt) || typeof bz !== 'number' || isNaN(bz)) {
+                return 'N/A';
             }
 
-            // Normale Behandlung (Höhere Werte sind kritischer, außer bei Bt/Dichte, wo sie neutraler sind)
-            if (value >= t.high) return 'bg-orange-400 text-white';
-            if (value >= t.normal) return 'bg-yellow-400 text-gray-800';
-            return 'bg-green-500 text-white';
+            // Der AL-Index ist negativ (quantifiziert den auroralen Elektrojet, der nach Westen fließt).
+            // Er ist proportional zur SCI-Energieeinspeisung.
+            
+            // Koeffizient, der die SCI-Energie in den AL-Index umrechnet (empirisch)
+            const conversionFactor = 0.2; 
+            
+            // Multipliziere SCI mit dem Faktor
+            let alIndex = -sci * conversionFactor;
+
+            // Führe eine zusätzliche Korrektur ein, wenn das Bz sehr stark Südwärts ist
+            if (bz < -10) {
+                 alIndex *= 1.2; // 20% Verstärkung bei extrem starker Südwärts-Kopplung
+            } else if (totalBt > 20) {
+                 alIndex *= 1.1; // 10% Verstärkung bei sehr hohem Bt (Stoßwelle)
+            }
+            
+            // Der AL-Index kann nicht beliebig klein werden (realistische Obergrenze)
+            if (alIndex < -3000) alIndex = -3000;
+            
+            // Runde auf ganze Zahlen für die Anzeige
+            return Math.round(alIndex);
         }
 
-        // Funktion zur Berechnung des Prognostizierten AL-Index (vereinfachtes SCI-Modell)
-        // SCI (Substorm Coupling Index) wird oft als Proxy für die Polarlichtaktivität verwendet.
-        // Formel: SCI ≈ (V * Bt * sin(theta/2)^4) - V ist Solarwind-Geschw., Bt ist Gesamtmagnetfeldstärke, theta ist Polarwinkel von Bz.
-        // Hier eine direkte empirische Annäherung für den AL-Index.
-        function calculateAlIndex(v, bt, bz) {
-            const V_ref = 400; // Referenzgeschwindigkeit in km/s
-            const B_ref = 5;   // Referenz-Magnetfeldstärke in nT
-            const Bz_critical = -0.5; // Bz Schwellenwert für Kopplung
+        /**
+         * Führt die Berechnung der geschätzten Ankunftszeit, des Dynamischen Drucks, 
+         * des SCI und der geschätzten Sturmbeginn-Zeit durch
+         */
+        const calculateArrival = (entry) => {
+            const speed = parseFloat(entry.speed);
+            const density = parseFloat(entry.density);
+            const bx = parseFloat(entry.bx_nt);
+            const by = parseFloat(entry.by_nt);
+            const bz = parseFloat(entry.bz_nt);
+            const timeTag = entry.time_tag;
 
-            if (bz >= Bz_critical || v < V_ref * 0.8) {
-                // Wenn Bz Nordwärts gerichtet ist oder die Geschwindigkeit zu niedrig ist, ist der AL-Index nahe Null (niedrige Aktivität).
-                return -Math.round(Math.random() * 50 + 10); // Zufälliger niedriger Wert
+            // 1. Berechnung des Magnetischen Totalwerts (Bt)
+            let totalBt = 'N/A';
+            if (!isNaN(bx) && !isNaN(by) && !isNaN(bz)) {
+                totalBt = Math.sqrt(bx*bx + by*by + bz*bz);
+            } else if (entry.bt_nt && entry.bt_nt !== 'N/A') {
+                 totalBt = parseFloat(entry.bt_nt);
             }
 
-            // Verstärkungsfaktor basierend auf der Geschwindigkeit (V^2 Abhängigkeit)
-            const V_factor = Math.pow(v / V_ref, 2);
+            // 2. Berechnung des Dynamischen Drucks (nPa)
+            let dynamicPressure = 'N/A';
+            if (!isNaN(speed) && speed > 0 && !isNaN(density) && density >= 0) {
+                dynamicPressure = DYNAMIC_PRESSURE_FACTOR * density * (speed * speed);
+            }
             
-            // Kopplungsfaktor: Hängt von der Bt und der Stärke des negativen Bz ab.
-            // Wir verwenden den Pufferdruck (Bt * Bz)
-            const Coupling_factor = bt * Math.abs(bz);
+            // 3. Berechnung des Substorm Coupling Index (SCI)
+            let sci = 'N/A';
+            if (!isNaN(speed) && speed > 0 && !isNaN(bz)) {
+                // SCI (V_sw * B_s)
+                sci = speed * Math.max(0, -bz);
+            }
 
-            // Der AL-Index ist negativ und proportional zu V_factor * Coupling_factor
-            // Multipliziere mit einem Skalierungsfaktor (z.B. 10) um auf die nT-Skala zu kommen
-            let al_index = -Math.round(V_factor * Coupling_factor * 10);
+            // 4. Berechnung des Prognostizierten AL-Index (NEU)
+            const progAlIndex = calculateProgALIndex(sci, totalBt, bz);
 
-            // Begrenze den maximalen Sturm
-            if (al_index < -1500) al_index = -1500;
+            // 5. Qualitative Risikobewertung
+            const sciRiskLevel = getSciRiskLevel(sci);
 
-            return al_index;
-        }
-
-
-        // Hauptfunktion zum Abrufen und Anzeigen der Daten
-        async function fetchSolarWindData() {
-            const loadingIndicator = document.getElementById('loading-indicator');
-            const dataTableBody = document.getElementById('data-table-body');
-            const statusContainer = document.getElementById('status-container');
+            // 6. Kritische Aufbauzeit (wird für Sturmbeginn benötigt)
+            const criticalBuildupDuration = getRequiredBuildupDuration(sci);
             
-            dataTableBody.innerHTML = '';
-            statusContainer.innerHTML = '';
-            loadingIndicator.classList.remove('hidden');
+            // 7. Berechnung der Ankunftszeit
+            let travelTimeHours = 'N/A';
+            let travelTimeMinutes = 'N/A';
+            let travelTimeMs = null;
+            let arrivalDate = 'Ungültige Geschw.';
+            let estimatedOnset = 'N/A';
 
-            try {
-                const response = await fetch(NOAA_API_URL);
-                if (!response.ok) throw new Error(`HTTP-Fehler! Status: ${response.status}`);
-                
-                const data = await response.json();
-                
-                // NOAA-Datenstruktur: [Header, [Timestamp, Speed, Density, Temp, Bt, Bz]]
-                // Wir nehmen die ersten 6 Zeilen (Index 1) der Daten, da Index 0 die Header sind.
-                const recentData = data.slice(1);
-                
-                // Variablen für die Echtzeit-Statuskarten (Neueste Messung)
-                let latestV = 0, latestDensity = 0, latestBt = 0, latestBz = 0, latestTDiff = 0, latestTime = new Date();
-                let latestAlIndex = 0;
-                let dataFound = false;
+            if (!isNaN(speed) && speed > 0 && speed <= 10000) {
+                const travelTimeSeconds = L1_DISTANCE_KM / speed;
+                travelTimeHours = travelTimeSeconds / 3600;
+                travelTimeMinutes = travelTimeSeconds / 60;
+                travelTimeMs = travelTimeSeconds * MS_PER_SEC;
+                const measurementDate = parseUtcTimeTag(timeTag);
+                arrivalDate = new Date(measurementDate.getTime() + travelTimeMs);
+            }
+            
+            // 8. Geschätzte Sturmbeginn-Zeit (Ankunftszeit + Kritische Aufbauzeit)
+            if (arrivalDate instanceof Date && !isNaN(arrivalDate) && criticalBuildupDuration !== SCI_DURATION_LOW_H) {
+                const durationMs = criticalBuildupDuration * 60 * 60 * 1000;
+                estimatedOnset = new Date(arrivalDate.getTime() + durationMs);
+            }
 
-                // Tabelle füllen (max. 10 Zeilen)
-                recentData.slice(0, 10).forEach((row, index) => {
-                    // Zeile: [Timestamp, Proton Speed, Proton Density, Ion Temperature, Total IMF, IMF Bz, Flow Pressure, Flow Angle, Phi Angle]
-                    // Index: [0, 1, 2, 3, 4, 5]
-                    
-                    const timestamp = row[0];
-                    const v = parseFloat(row[1]); // Geschwindigkeit (km/s)
-                    const density = parseFloat(row[2]); // Dichte (p/cc)
-                    const bt = parseFloat(row[4]); // Total IMF (Bt) (nT)
-                    const bz = parseFloat(row[5]); // IMF Bz (nT)
-                    const temp = parseFloat(row[3]); // Ion Temperature (°K)
-                    
-                    // Berechne die Temperaturdifferenz zur erwarteten Temperatur (vereinfacht)
-                    // Erwartete Temperatur T_exp ≈ (4e-5 * V)^2.1
-                    // Temp.Diff = T_exp - T_measured (Ein großer negativer Wert signalisiert 'überhitzten' Wind, was oft nach Schockwellen auftritt)
-                    const t_exp = 4.41e-5 * v * v;
-                    const t_diff = t_exp - temp;
-                    
-                    const al_index = calculateAlIndex(v, bt, bz);
 
-                    // Aktualisiere die neuesten Werte für die Statuskarten
-                    if (index === 0 && !isNaN(v)) {
-                        latestV = v;
-                        latestDensity = density;
-                        latestBt = bt;
-                        latestBz = bz;
-                        latestTDiff = t_diff;
-                        latestAlIndex = al_index;
-                        latestTime = new Date(timestamp);
-                        dataFound = true;
+            return {
+                ...entry,
+                dynamic_pressure_npa: dynamicPressure,
+                substorm_coupling_index: sci, 
+                prog_al_index: progAlIndex, // NEU: Prog. AL-Index
+                sci_risk_level: sciRiskLevel, 
+                critical_buildup_duration_h: criticalBuildupDuration, // Wird intern behalten
+                total_bt: totalBt, 
+                travel_time_h: travelTimeHours,
+                travel_time_m: travelTimeMinutes, 
+                travel_time_ms: travelTimeMs,
+                arrival_time: arrivalDate,
+                estimated_onset_time: estimatedOnset, 
+            };
+        };
+
+
+        // =========================================================================
+        // === Statuskarten-Logik ===
+        // =========================================================================
+
+        /**
+         * Aktualisiert die Statuskarte über der Tabelle mit den aktuellsten Werten.
+         */
+        const updateStatusCard = (entry) => {
+            const nowUtc = new Date();
+            
+            // 1. Messzeitpunkt
+            latestTimeTagEl.textContent = entry.time_tag.substring(11, 16) + ' UTC';
+
+            // 2. Ankunftszeit
+            let arrivalText = 'Wird berechnet...';
+            let arrivalColor = 'text-gray-300';
+            
+            if (entry.arrival_time instanceof Date && !isNaN(entry.arrival_time)) {
+                const diffMs = entry.arrival_time.getTime() - nowUtc.getTime();
+                const arrivalTimeStr = entry.arrival_time.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+                
+                if (diffMs <= 0) {
+                    arrivalText = `ANGEKOMMEN! ${arrivalTimeStr} UTC`;
+                    arrivalColor = 'text-green-500';
+                } else if (diffMs <= THIRTY_MINUTES_MS) {
+                    arrivalText = `🔜 ${arrivalTimeStr} UTC (Bald!)`;
+                    arrivalColor = 'text-red-400';
+                } else {
+                    arrivalText = `${arrivalTimeStr} UTC (${entry.travel_time_h.toFixed(1)} h)`;
+                    arrivalColor = 'text-blue-400';
+                }
+            }
+            arrivalTimeStatusEl.textContent = arrivalText;
+            arrivalTimeStatusEl.className = `metric-value ${arrivalColor}`;
+
+            // 3. Prog. AL-Index (NEU)
+            const alIndex = entry.prog_al_index;
+            let alText = String(alIndex);
+            let alColor = 'text-gray-300';
+            
+            if (typeof alIndex === 'number') {
+                alText = `${alIndex.toFixed(0)} nT`;
+                if (alIndex <= AL_INDEX_CRITICAL_NT) {
+                    alColor = 'text-red-400 font-extrabold';
+                } else if (alIndex <= AL_INDEX_ELEVATED_NT) {
+                    alColor = 'text-orange-300';
+                } else {
+                    alColor = 'text-green-400';
+                }
+            }
+            alIndexStatusEl.textContent = alText;
+            alIndexStatusEl.className = `metric-value ${alColor}`;
+
+            // 4. SCI Risiko
+            const sci = entry.substorm_coupling_index;
+            let sciText = entry.sci_risk_level;
+            let sciColor = 'text-gray-300';
+
+            if (typeof sci === 'number') {
+                if (sci > SCI_WATCH_HIGH) {
+                    sciColor = 'text-red-400 font-extrabold';
+                } else if (sci > SCI_WATCH_ELEVATED) {
+                    sciColor = 'text-orange-400 font-bold';
+                } else if (sci > SCI_WATCH_LOW) {
+                    sciColor = 'text-yellow-400';
+                }
+                sciText = sciText.replace('🚨 HOCH', 'HOCH');
+                sciText = sciText.replace('⚠️ Erhöht', 'Erhöht');
+            }
+            sciRiskStatusEl.textContent = sciText;
+            sciRiskStatusEl.className = `metric-value ${sciColor}`;
+        };
+
+
+        // =========================================================================
+        // === Tabellen- und UI-Logik ===
+        // =========================================================================
+
+        /**
+         * Rendert die Daten in die HTML-Tabelle
+         */
+        const renderTable = (data) => {
+            tableBody.innerHTML = '';
+            if (data.length === 0) {
+                statusMessage.textContent = 'Keine Daten in den letzten 2 Stunden zum Anzeigen vorhanden.';
+                statusMessage.classList.remove('hidden', 'bg-red-900', 'bg-green-900/50');
+                statusMessage.classList.add('bg-yellow-900', 'text-yellow-400');
+                plasmaTable.classList.add('hidden');
+                return;
+            }
+            
+            const nowUtc = new Date();
+
+            data.forEach((entry, index) => {
+                
+                let isArrived = false;
+                if (entry.arrival_time instanceof Date && !isNaN(entry.arrival_time)) {
+                    if (entry.arrival_time.getTime() <= nowUtc.getTime()) {
+                        isArrived = true;
+                    }
+                }
+
+                let rowClass = index % 2 !== 0 ? 'bg-gray-700/50' : '';
+                rowClass += isArrived ? ' highlight-row' : '';
+
+                const row = document.createElement('tr');
+                row.className = `border-b border-gray-700 hover:bg-gray-700 transition duration-150 ${rowClass}`;
+
+                // --- Bz (Magnetfeld) Verbesserungen ---
+                let bzColor = 'text-gray-300';
+                let bzIcon = '';
+                const bz = parseFloat(entry.bz_nt);
+                if (!isNaN(bz)) {
+                    if (bz < -5) { 
+                        bzColor = 'text-red-400 font-bold';
+                        bzIcon = '⬇️'; 
+                    } else if (bz < 0) {
+                        bzColor = 'text-orange-300';
+                        bzIcon = '↓'; 
+                    } else if (bz > 5) {
+                        bzColor = 'text-blue-300';
+                        bzIcon = '⬆️'; 
+                    } else if (bz > 0) {
+                        bzColor = 'text-green-400';
+                        bzIcon = '↑'; 
+                    }
+                }
+
+                // Farben für die Geschwindigkeit
+                let speedColor = 'text-green-400';
+                const speed = parseFloat(entry.speed);
+                if (speed > 550) {
+                    speedColor = 'text-red-400 font-bold';
+                } else if (speed > 450) {
+                    speedColor = 'text-yellow-400';
+                }
+
+                // --- Dyn. Druck Hervorhebung und Kompression ---
+                let pressureColor = 'text-gray-300';
+                let compressionIcon = '';
+                const pressure = entry.dynamic_pressure_npa;
+                const density = parseFloat(entry.density);
+
+                if (typeof pressure === 'number') {
+                    if (pressure > CRITICAL_PRESSURE_NPA) {
+                        pressureColor = 'text-red-400 font-bold'; 
+                    } else if (pressure > 5.0) {
+                        pressureColor = 'text-orange-400'; 
+                    } else if (pressure < 0.5) {
+                        pressureColor = 'text-gray-500'; 
+                    }
+                }
+
+                // Kompressions-Indikator
+                if (!isNaN(density) && density >= CRITICAL_DENSITY && typeof pressure === 'number' && pressure > 5.0) {
+                    pressureColor = 'text-yellow-300 font-extrabold'; 
+                    compressionIcon = '💥 STAU!'; 
+                }
+
+                // --- Total Bt Hervorhebung ---
+                let btColor = 'text-gray-300';
+                const totalBt = entry.total_bt;
+                if (typeof totalBt === 'number' && totalBt > CRITICAL_BT) {
+                    btColor = 'text-yellow-300 font-bold';
+                } else if (typeof totalBt === 'number' && totalBt < 5.0) {
+                    btColor = 'text-gray-500';
+                }
+
+                // --- SCI (Substorm Coupling Index) und Reihen-Klassifizierung ---
+                const sci = entry.substorm_coupling_index;
+                let sciColor = 'text-gray-300';
+                
+                if (typeof sci === 'number') {
+                    if (sci > SCI_WATCH_HIGH) {
+                        sciColor = 'text-red-400 font-extrabold';
+                        row.classList.add('substorm-watch-high'); 
+                    } else if (sci > SCI_WATCH_ELEVATED) {
+                        sciColor = 'text-orange-400 font-bold';
+                        row.classList.add('substorm-watch-elevated');
+                    } else if (sci > SCI_WATCH_LOW) {
+                        sciColor = 'text-yellow-400';
+                    }
+                }
+                
+                const sciValue = typeof sci === 'number' ? sci.toFixed(0) : String(sci);
+                
+                // --- Prog. AL-Index Hervorhebung (NEU) ---
+                const alIndex = entry.prog_al_index;
+                let alIndexColor = 'text-gray-400';
+                const alIndexValue = typeof alIndex === 'number' ? alIndex.toFixed(0) : String(alIndex);
+
+                if (typeof alIndex === 'number') {
+                    if (alIndex <= AL_INDEX_CRITICAL_NT) {
+                        alIndexColor = 'text-red-400 font-extrabold';
+                    } else if (alIndex <= AL_INDEX_ELEVATED_NT) {
+                        alIndexColor = 'text-orange-400 font-bold';
+                    } else if (alIndex < 0) {
+                         alIndexColor = 'text-yellow-400';
+                    } else {
+                        alIndexColor = 'text-green-400';
+                    }
+                }
+
+                // TABELLENZELLEN HINZUFÜGEN
+                row.innerHTML += `<td class="py-3 px-6 text-left">${formatTime(parseUtcTimeTag(entry.time_tag))}</td>`;
+                row.innerHTML += `<td class="py-3 px-6 text-left ${speedColor}">${parseFloat(entry.speed).toFixed(1)}</td>`;
+                row.innerHTML += `<td class="py-3 px-6 text-left">${parseFloat(entry.density).toFixed(2)}</td>`;
+                
+                // Dynamischer Druck Zelle
+                const pressureValue = typeof pressure === 'number' ? pressure.toFixed(2) : String(pressure);
+                row.innerHTML += `<td class="py-3 px-6 text-left ${pressureColor}">
+                    ${compressionIcon ? `<span class="mr-1">${compressionIcon}</span>` : ''}${pressureValue}
+                </td>`;
+                
+                // Total Bt Zelle
+                const totalBtValue = typeof totalBt === 'number' ? totalBt.toFixed(1) : String(totalBt);
+                row.innerHTML += `<td class="py-3 px-6 text-left ${btColor}">${totalBtValue}</td>`;
+                
+                // Bz (nT)
+                row.innerHTML += `<td class="py-3 px-6 text-left ${bzColor}">
+                    ${bzIcon ? `<span class="mr-1">${bzIcon}</span>` : ''}${parseFloat(entry.bz_nt).toFixed(1)}
+                </td>`;
+
+                // Prog. AL-Index (NEU)
+                 row.innerHTML += `<td class="py-3 px-6 text-left ${alIndexColor}">
+                    ${alIndexValue}
+                </td>`;
+
+
+                // SCI (Substorm Coupling Index) Zelle
+                 row.innerHTML += `<td class="py-3 px-6 text-left ${sciColor}">
+                    ${sciValue}
+                </td>`;
+                
+                // Geschätzte Sturmbeginn-Zeit
+                let onsetTimeText = 'N/A';
+                let onsetTimeColor = 'text-gray-400';
+                
+                if (entry.estimated_onset_time instanceof Date && !isNaN(entry.estimated_onset_time)) {
+                    onsetTimeText = formatTime(entry.estimated_onset_time).substring(11, 20); 
+                    const diffMs = entry.estimated_onset_time.getTime() - nowUtc.getTime();
+
+                    if (diffMs > 0 && diffMs <= THIRTY_MINUTES_MS) {
+                        onsetTimeColor = 'text-red-300 font-bold';
+                        onsetTimeText = `⚠️ SOON! ${onsetTimeText}`;
+                    } else if (diffMs <= 0) {
+                        onsetTimeColor = 'text-red-400 font-extrabold';
+                        onsetTimeText = `⚠️ JETZT! ${onsetTimeText}`;
+                    } else {
+                        onsetTimeColor = 'text-blue-300';
+                    }
+                }
+                
+                row.innerHTML += `<td class="py-3 px-6 text-left ${onsetTimeColor}">${onsetTimeText}</td>`;
+
+                // Substurm-Risiko Zelle
+                let riskColor = '';
+                if (entry.sci_risk_level.startsWith('🚨 HOCH')) {
+                    riskColor = 'text-red-400 font-bold';
+                } else if (entry.sci_risk_level.startsWith('⚠️ Erhöht')) {
+                    riskColor = 'text-orange-400';
+                } else if (entry.sci_risk_level.startsWith('Mittel')) {
+                    riskColor = 'text-yellow-400';
+                } else {
+                    riskColor = 'text-gray-400';
+                }
+
+                row.innerHTML += `<td class="py-3 px-6 text-left ${riskColor}">
+                    ${entry.sci_risk_level}
+                </td>`;
+
+
+                // --- Überhol-Indikator ---
+                let isOvertaking = false;
+                if (index < data.length - 1) {
+                    const nextEntry = data[index + 1]; 
+                    const currentArrival = entry.arrival_time instanceof Date ? entry.arrival_time.getTime() : Infinity;
+                    const nextArrival = nextEntry.arrival_time instanceof Date ? nextEntry.arrival_time.getTime() : Infinity;
+
+                    if (currentArrival < nextArrival) {
+                        isOvertaking = true;
+                    }
+                }
+                
+                // Ankunftszeit
+                let arrivalTimeCell = `<td class="py-3 px-6 text-left">`;
+                
+                if (entry.arrival_time instanceof Date && !isNaN(entry.arrival_time)) {
+                    const diffMs = entry.arrival_time.getTime() - nowUtc.getTime();
+                    
+                    let timeText = entry.arrival_time.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' }) + ' UTC';
+                    let cellClass = '';
+
+                    if (isOvertaking) {
+                        cellClass += ' bg-pink-900/40 border-l border-pink-600';
+                        timeText = `<span class="text-pink-400 font-extrabold">🏎️ ÜBERHOLT! ${timeText}</span>`;
+                    }
+                    
+                    else if (diffMs > 0 && diffMs <= THIRTY_MINUTES_MS) {
+                        cellClass = 'bg-blue-900/40 border-r border-blue-600';
+                        timeText = `<span class="text-blue-300 font-extrabold">🔜 ${timeText}</span>`;
+                    } 
+                    
+                    else if (isArrived) {
+                        timeText = `<span class="font-bold text-gray-200">${timeText}</span>`;
+                    } 
+                    
+                    else {
+                        timeText = `<span class="font-medium">${timeText}</span>`;
                     }
 
-                    // Erstelle die Tabellenzeile nur, wenn die Hauptwerte gültig sind
-                    if (!isNaN(v) && !isNaN(density) && !isNaN(bt) && !isNaN(bz) && !isNaN(al_index)) {
-                        const date = new Date(timestamp);
-                        const timeString = date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+                    arrivalTimeCell = `<td class="py-3 px-6 text-left ${cellClass}">`;
+                    arrivalTimeCell += timeText;
+                    
+                } else {
+                    arrivalTimeCell += `<span class="text-red-500">${entry.arrival_time}</span>`;
+                }
+                arrivalTimeCell += `</td>`;
+                row.innerHTML += arrivalTimeCell;
+                
+                tableBody.appendChild(row);
+            });
+            plasmaTable.classList.remove('hidden');
+        };
+
+        /**
+         * Sortiert die Daten basierend auf der ausgewählten Spalte und Richtung
+         */
+        const sortData = () => {
+            const keyMap = {
+                'time_tag': d => parseUtcTimeTag(d.time_tag).getTime(),
+                'speed': d => parseFloat(d.speed) || -Infinity,
+                'density': d => parseFloat(d.density) || -Infinity,
+                'dynamic_pressure_npa': d => typeof d.dynamic_pressure_npa === 'number' ? d.dynamic_pressure_npa : -Infinity,
+                'total_bt': d => typeof d.total_bt === 'number' ? d.total_bt : -Infinity,
+                'bz_nt': d => parseFloat(d.bz_nt) || -Infinity,
+                'prog_al_index': d => typeof d.prog_al_index === 'number' ? d.prog_al_index : -Infinity, // NEU: Prog. AL-Index
+                'substorm_coupling_index': d => typeof d.substorm_coupling_index === 'number' ? d.substorm_coupling_index : -Infinity,
+                'estimated_onset_time': d => d.estimated_onset_time instanceof Date ? d.estimated_onset_time.getTime() : Infinity,
+                'sci_risk_level': d => typeof d.substorm_coupling_index === 'number' ? d.substorm_coupling_index : -Infinity, 
+                'arrival_time': d => d.travel_time_ms !== null ? parseUtcTimeTag(d.time_tag).getTime() + d.travel_time_ms : -Infinity,
+            };
+
+            allData.sort((a, b) => {
+                const valA = keyMap[sortColumn](a);
+                const valB = keyMap[sortColumn](b);
+
+                let comparison = 0;
+                if (valA > valB) {
+                    comparison = 1;
+                } else if (valA < valB) {
+                    comparison = -1;
+                }
+
+                // Standardmäßig absteigende Sortierung (neueste, größte, kritischste Werte zuerst)
+                let finalComparison = comparison * -1; 
+                
+                // Sonderfall: Zeitspalten (time_tag, arrival_time) -> Absteigend (neueste zuerst) ist Standard
+                if (sortColumn === 'time_tag' || sortColumn === 'arrival_time') {
+                    finalComparison = sortDirection === 'asc' ? comparison : comparison * -1;
+                }
+
+                // Sonderfall: Gesch. Sturmbeginn-Zeit -> Aufsteigend (frühester Termin zuerst) ist kritischer
+                if (sortColumn === 'estimated_onset_time') {
+                    finalComparison = comparison; // Aufsteigend (frühester zuerst)
+                }
+
+                // Sonderfall: Bz und Prog. AL-Index -> Negative (kleinste) Werte sind kritischer.
+                if (sortColumn === 'bz_nt' || sortColumn === 'prog_al_index') {
+                    // Aufsteigend (ASC): Negativste (kritischste) Werte zuerst
+                    finalComparison = comparison;
+                }
+                
+                return finalComparison;
+            });
+
+            document.querySelectorAll('[data-sort-icon]').forEach(icon => icon.textContent = '');
+            const currentIcon = document.querySelector(`[data-sort-icon="${sortColumn}"]`);
+            if (currentIcon) {
+                // Anzeige der Sortierrichtung
+                
+                 let displayDirection = '';
+                if (sortColumn === 'bz_nt' || sortColumn === 'prog_al_index' || sortColumn === 'estimated_onset_time') {
+                    // Diese Spalten sortieren standardmäßig kritische Werte zuerst (Bz/AL negativ, Onset früh)
+                    displayDirection = '↓';
+                } else {
+                    displayDirection = sortDirection === 'asc' ? '↑' : '↓';
+                }
+                currentIcon.textContent = displayDirection;
+            }
+            // Standardmäßig nach Zeit absteigend sortieren
+            if (sortColumn === 'time_tag') {
+                const defaultIcon = document.querySelector(`[data-sort-icon="time_tag"]`);
+                defaultIcon.textContent = '↓';
+            }
+
+            renderTable(allData);
+        };
+
+        /**
+         * Holt die Daten von einem NOAA-Endpunkt
+         */
+        const fetchData = async (url) => {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP-Fehler beim Laden von ${url}: ${response.status}`);
+            }
+            const rawData = await response.json();
+            return rawData.slice(1);
+        };
+
+
+        /**
+         * Hauptfunktion zum Abrufen und Verarbeiten der Daten
+         */
+        const fetchSolarWindData = async () => {
+            loadingIndicator.classList.remove('hidden');
+            statusMessage.classList.add('hidden');
+            plasmaTable.classList.add('hidden');
+
+            try {
+                
+                const [plasmaDataRaw, magDataRaw] = await Promise.all([
+                    fetchData(PLASMA_API_URL),
+                    fetchData(MAG_API_URL)
+                ]);
+
+                // Indizes für das Magnetfeld-Array:
+                const MAG_TIME_INDEX = 0;
+                const MAG_BX_INDEX = 1;
+                const MAG_BY_INDEX = 2;
+                const MAG_BZ_INDEX = 3;
+                const MAG_BT_INDEX = 4;
+
+                const magMap = new Map();
+                magDataRaw.forEach(row => {
+                    const timeTag = row[MAG_TIME_INDEX];
+                    // Überprüfen auf NOAA-Platzhalter (z.B. "999.9" oder "-9999.9")
+                    if (row[MAG_BX_INDEX] !== 'null' && parseFloat(row[MAG_BX_INDEX]) > -900 &&
+                        row[MAG_BY_INDEX] !== 'null' && parseFloat(row[MAG_BY_INDEX]) > -900 &&
+                        row[MAG_BZ_INDEX] !== 'null' && parseFloat(row[MAG_BZ_INDEX]) > -900) {
                         
-                        const rowHtml = `
-                            <tr>
-                                <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">${timeString}</td>
-                                <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">${v.toFixed(1)}</td>
-                                <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">${density.toFixed(2)}</td>
-                                <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">${bt.toFixed(1)}</td>
-                                <td class="px-3 py-2 whitespace-nowrap text-sm ${bz < 0 ? 'text-red-600 font-semibold' : 'text-green-600'}">${bz.toFixed(1)}</td>
-                                <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">${t_diff.toFixed(0)}</td>
-                                <td class="px-3 py-2 whitespace-nowrap text-sm ${al_index < -100 ? 'text-red-700 font-bold' : 'text-gray-900'}">${al_index.toFixed(0)}</td>
-                            </tr>
-                        `;
-                        dataTableBody.insertAdjacentHTML('beforeend', rowHtml);
+                        magMap.set(timeTag, {
+                            bx_nt: row[MAG_BX_INDEX],
+                            by_nt: row[MAG_BY_INDEX],
+                            bz_nt: row[MAG_BZ_INDEX],
+                            bt_nt: row[MAG_BT_INDEX] || 'N/A'
+                        });
                     }
                 });
 
-                // Statuskarten aktualisieren
-                if (dataFound) {
-                    const statusData = [
-                        { label: 'Geschwindigkeit', value: latestV.toFixed(0), unit: thresholds.speed.unit, key: 'speed' },
-                        { label: 'Dichte', value: latestDensity.toFixed(1), unit: thresholds.density.unit, key: 'density' },
-                        { label: 'Bt (Gesamt)', value: latestBt.toFixed(1), unit: thresholds.bt.unit, key: 'bt' },
-                        { label: 'Bz (Richtung)', value: latestBz.toFixed(1), unit: thresholds.bz.unit, key: 'bz' },
-                        // Prognostizierter AL-Index als zusätzliche, wichtige Karte
-                        { label: 'Prog. AL-Index', value: latestAlIndex.toFixed(0), unit: thresholds.al_index.unit, key: 'al_index' },
-                        // Temperatur-Differenz (wichtig für Stoßwellen)
-                        { label: 'Temp-Diff', value: latestTDiff.toFixed(0), unit: thresholds.tdiff.unit, key: 'tdiff' }
-                    ];
+                const processedData = plasmaDataRaw.map(row => {
+                    const timeTag = row[0];
+                    const magEntry = magMap.get(timeTag) || { bx_nt: 'N/A', by_nt: 'N/A', bz_nt: 'N/A', bt_nt: 'N/A' };
+                    
+                    const entry = {
+                        time_tag: timeTag,
+                        density: row[1],
+                        speed: row[2],
+                        bx_nt: magEntry.bx_nt, 
+                        by_nt: magEntry.by_nt,
+                        bz_nt: magEntry.bz_nt,
+                        bt_nt: magEntry.bt_nt,
+                    };
+                    return calculateArrival(entry);
+                });
 
-                    // Nur die ersten 4 wichtigsten Karten anzeigen
-                    statusData.slice(0, 4).forEach(item => {
-                        const statusClass = getStatusClass(item.key, parseFloat(item.value));
-                        const cardHtml = `
-                            <div class="status-card p-4 rounded-xl shadow-md flex flex-col justify-center items-center ${statusClass}">
-                                <div class="text-xl md:text-3xl font-bold">${item.value}</div>
-                                <div class="text-sm md:text-base font-medium mt-1">${item.unit}</div>
-                                <div class="text-xs md:text-sm font-light mt-1">${item.label}</div>
-                            </div>
-                        `;
-                        statusContainer.insertAdjacentHTML('beforeend', cardHtml);
+                if (processedData.length > 0) {
+                    
+                    // Finde den neuesten Eintrag zur Anzeige im Status-Dashboard
+                    const sortedByTime = [...processedData].sort((a, b) => 
+                        parseUtcTimeTag(b.time_tag).getTime() - parseUtcTimeTag(a.time_tag).getTime()
+                    );
+                    const latestEntry = sortedByTime.find(e => 
+                        parseFloat(e.speed) > 0 && 
+                        typeof e.substorm_coupling_index === 'number'
+                    );
+
+                    if (latestEntry) {
+                        updateStatusCard(latestEntry);
+                    }
+
+                    const latestTimeMs = parseUtcTimeTag(sortedByTime[0].time_tag).getTime();
+                    const cutoffTimeMs = latestTimeMs - TWO_HOURS_MS;
+
+                    allData = processedData.filter(entry => {
+                        const entryTimeMs = parseUtcTimeTag(entry.time_tag).getTime();
+                        return entryTimeMs >= cutoffTimeMs;
                     });
 
-                    // Aktualisiere den Zeitstempel (mit nativer JS-Formatierung)
-                    document.getElementById('last-updated').textContent = `Zuletzt gemessen: ${latestTime.toLocaleDateString('de-DE')} um ${latestTime.toLocaleTimeString('de-DE')} UTC`;
+                    statusMessage.textContent = `Daten (24h Quellen) erfolgreich geladen. Zeige ${allData.length} Einträge der letzten 2 Stunden (bis zum letzten Messwert, UTC). Nächste Aktualisierung in 1 Minute.`;
+                    statusMessage.classList.remove('hidden', 'bg-red-900', 'bg-yellow-900');
+                    statusMessage.classList.add('bg-green-900/50', 'text-green-400', 'font-semibold');
+
                 } else {
-                    document.getElementById('last-updated').textContent = 'Keine aktuellen Daten verfügbar.';
-                    dataTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-500">Konnte keine gültigen Solarwinddaten abrufen.</td></tr>';
+                    allData = [];
+                    statusMessage.textContent = 'Daten erfolgreich geladen, aber keine Einträge in den letzten 2 Stunden gefunden.';
+                    statusMessage.classList.remove('hidden', 'bg-red-900', 'bg-green-900/50');
+                    statusMessage.classList.add('bg-yellow-900', 'text-yellow-400');
                 }
 
+                sortData();
+
             } catch (error) {
-                console.error("Fehler beim Abrufen der NOAA-Daten:", error);
-                document.getElementById('last-updated').textContent = 'Fehler beim Laden der Daten.';
-                dataTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-red-500">Fehler: Daten konnten nicht geladen werden. Siehe Konsole für Details.</td></tr>';
+                console.error("Fehler beim Abrufen der Daten:", error);
+                statusMessage.textContent = `Fehler beim Laden der Daten: ${error.message}. Nächste Aktualisierung in 1 Minute.`;
+                statusMessage.classList.remove('hidden', 'bg-green-900/50', 'bg-yellow-900');
+                statusMessage.classList.add('bg-red-900', 'text-red-400');
             } finally {
                 loadingIndicator.classList.add('hidden');
             }
-        }
+        };
 
-        // Starte den Datenabruf beim Laden der Seite
-        window.onload = function() {
+        /**
+         * Startet den initialen Ladevorgang und richtet den Auto-Refresh-Intervall ein.
+         */
+        const startApp = () => {
+            headers.forEach(header => {
+                header.addEventListener('click', (e) => {
+                    const key = e.currentTarget.dataset.sortKey;
+                    if (sortColumn === key) {
+                        // Bei Klick auf dieselbe Spalte: Richtung umkehren
+                        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        // Bei Klick auf neue Spalte: Standardrichtung setzen
+                        sortColumn = key;
+                        
+                        // Standard: DESC (Neueste, größte, kritischste Werte zuerst)
+                        sortDirection = 'desc'; 
+                        
+                        // Ausnahmen:
+                        // Bz/AL-Index: ASC (negativste Werte zuerst) ist kritischer.
+                         if (key === 'bz_nt' || key === 'prog_al_index' || key === 'estimated_onset_time') {
+                            sortDirection = 'asc'; 
+                        }
+                    }
+                    sortData();
+                });
+            });
+
             fetchSolarWindData();
-            // Aktualisiere alle 5 Minuten (300000 ms)
-            setInterval(fetchSolarWindData, 300000);
-        }
+            setInterval(fetchSolarWindData, REFRESH_INTERVAL_MS);
+        };
+
+        window.onload = startApp;
     </script>
 </body>
 </html>
