@@ -1,0 +1,60 @@
+/* Spezifische Schriftart */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #0d1117; /* Dunkler Hintergrund */
+    color: #c9d1d9; /* Heller Text */
+}
+.header-cell {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.header-cell:hover {
+    background-color: #21262d;
+}
+.loading-animation {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top: 4px solid #58a6ff;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* HIGHTLIGHT-KLASSE: Markiert Daten, deren Ankunft theoretisch bereits erfolgt ist */
+.highlight-row {
+    background-color: #1a222e; /* Dunkler, dezenter Blauton */
+    border-left: 4px solid #3b82f6; /* Subtiler blauer Rand */
+}
+.highlight-row:hover {
+    background-color: #242c38 !important;
+}
+.substorm-watch-high {
+    background-color: #450a0a !important; /* Dunkelrot */
+    border-left: 4px solid #ef4444 !important;
+    font-weight: bold;
+}
+.substorm-watch-elevated {
+    background-color: #422006 !important; /* Dunkelorange */
+    border-left: 4px solid #f97316 !important;
+}
+.status-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+}
+.status-metric {
+    background-color: #161b22;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #30363d;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    text-align: center;
+}
+.metric-value {
+    font-size: 1.875rem; /* text-3xl */
+    font-weight: 800; /* font-extrabold */
+}
