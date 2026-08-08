@@ -41,8 +41,16 @@ const fetchData = async (url) => {
         throw new Error(`HTTP-Fehler beim Laden von ${url}: ${response.status}`);
     }
     const rawData = await response.json();
-    const [header, ...rows] = rawData;
 
+    if (!Array.isArray(rawData)) {
+        throw new Error(`Unerwartetes Datenformat von ${url}`);
+    }
+
+    if (rawData.every(row => row && typeof row === 'object' && !Array.isArray(row))) {
+        return rawData;
+    }
+
+    const [header, ...rows] = rawData;
     if (!Array.isArray(header)) {
         throw new Error(`Unerwartetes Datenformat von ${url}`);
     }
