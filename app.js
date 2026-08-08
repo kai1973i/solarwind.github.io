@@ -78,9 +78,9 @@ const fetchSolarWindData = async () => {
         const magMap = new Map();
         magDataRaw.forEach(row => {
             const timeTag = row.time_tag;
-            const bx = getFirstValidValue(row.bx, row.bx_gsm, row.bx_gse, row.b1);
-            const by = getFirstValidValue(row.by, row.by_gsm, row.by_gse, row.b2);
-            const bz = getFirstValidValue(row.bz, row.bz_gsm, row.bz_gse, row.b3);
+            const bx = getFirstValidValue(row.bx_gsm, row.bx_gse, row.bx, row.b1);
+            const by = getFirstValidValue(row.by_gsm, row.by_gse, row.by, row.b2);
+            const bz = getFirstValidValue(row.bz_gsm, row.bz_gse, row.bz, row.b3);
             const bt = getFirstValidValue(row.bt, row.total_bt);
 
             if (timeTag &&
