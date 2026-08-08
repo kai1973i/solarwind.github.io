@@ -31,6 +31,10 @@ export const AL_INDEX_ELEVATED_NT = -200;
 
 let allData = [];
 
+const getFirstValidValue = (...values) => (
+    values.find(value => value != null && value !== '' && value !== 'null') ?? null
+);
+
 const fetchData = async (url) => {
     const response = await fetch(url);
     if (!response.ok) {
@@ -43,9 +47,11 @@ const fetchData = async (url) => {
         throw new Error(`Unerwartetes Datenformat von ${url}`);
     }
 
-    return rows.map(row => (
+    return rows
+        .filter(Array.isArray)
+        .map(row => (
         Object.fromEntries(header.map((key, index) => [key, row[index]]))
-    ));
+        ));
 };
 
 const fetchSolarWindData = async () => {
@@ -60,10 +66,10 @@ const fetchSolarWindData = async () => {
         const magMap = new Map();
         magDataRaw.forEach(row => {
             const timeTag = row.time_tag;
-            const bx = row.bx ?? row.bx_gsm ?? row.bx_gse;
-            const by = row.by ?? row.by_gsm ?? row.by_gse;
-            const bz = row.bz ?? row.bz_gsm ?? row.bz_gse;
-            const bt = row.bt ?? row.total_bt;
+            const bx = getFirstValidValue(row.bx, row.bx_gsm, row.bx_gse);
+            const by = getFirstValidValue(row.by, row.by_gsm, row.by_gse);
+            const bz = getFirstValidValue(row.bz, row.bz_gsm, row.bz_gse);
+            const bt = getFirstValidValue(row.bt, row.total_bt);
 
             if (timeTag &&
                 bx != null && bx !== 'null' && parseFloat(bx) > -900 &&
