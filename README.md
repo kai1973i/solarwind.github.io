@@ -37,7 +37,7 @@ Die Anwendung verwendet aktuelle NOAA-SWPC-JSON-Feeds mit rollierendem Zeitfenst
 - Plasma-/Geschwindigkeitsdaten: `https://services.swpc.noaa.gov/json/solar-wind/plasma-7-day.json`
 - Magnetfelddaten: `https://services.swpc.noaa.gov/json/solar-wind/mag-7-day.json`
 
-Die Antwortdaten werden sowohl im neueren Objektformat als auch im älteren headerbasierten Array-Format verarbeitet. Für Magnetfeldwerte bevorzugt die Anwendung qualifizierte NOAA-Feldnamen wie `*_gsm` und `*_gse`, unterstützt aber auch `bx`/`by`/`bz` sowie `b1`/`b2`/`b3`. Falls vorhanden, wird `propagated_time_tag` direkt als Ankunftszeit an der Erde verwendet.
+Die Antwortdaten werden sowohl im neueren Objektformat als auch im älteren headerbasierten Array-Format verarbeitet. Für Magnetfeldwerte bevorzugt die Anwendung GSM-nahe Felder wie `bx_gsm`/`by_gsm`/`bz_gsm` und unterstützt zusätzlich `bx`/`by`/`bz` sowie `b1`/`b2`/`b3`. Falls vorhanden, wird `propagated_time_tag` direkt als Ankunftszeit an der Erde verwendet.
 
 ## Lokale Nutzung
 
