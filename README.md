@@ -32,12 +32,12 @@ Diese Anwendung visualisiert Echtzeit-Solarwind- und Magnetfelddaten des NOAA Sp
 
 ## Datenquellen
 
-Die Anwendung verwendet die aktuellen NOAA-SWPC-Endpoints:
+Die Anwendung verwendet aktuelle NOAA-SWPC-JSON-Feeds mit rollierendem Zeitfenster:
 
-- Plasma-/Geschwindigkeitsdaten: `https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json`
-- Magnetfelddaten: `https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json`
+- Plasma-/Geschwindigkeitsdaten: `https://services.swpc.noaa.gov/json/solar-wind/plasma-7-day.json`
+- Magnetfelddaten: `https://services.swpc.noaa.gov/json/solar-wind/mag-7-day.json`
 
-Die Antwortdaten werden sowohl im neueren Objektformat als auch im älteren headerbasierten Array-Format verarbeitet. Für Magnetfeldwerte bevorzugt die Anwendung `bx`/`by`/`bz` und nutzt bei Bedarf `*_gsm` bzw. `*_gse` als Fallback. Falls vorhanden, wird `propagated_time_tag` direkt als Ankunftszeit an der Erde verwendet.
+Die Antwortdaten werden sowohl im neueren Objektformat als auch im älteren headerbasierten Array-Format verarbeitet. Für Magnetfeldwerte bevorzugt die Anwendung `bx`/`by`/`bz`, unterstützt aber auch alternative NOAA-Feldnamen wie `*_gsm`, `*_gse` und `b1`/`b2`/`b3`. Falls vorhanden, wird `propagated_time_tag` direkt als Ankunftszeit an der Erde verwendet.
 
 ## Lokale Nutzung
 
