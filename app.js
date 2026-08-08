@@ -32,7 +32,7 @@ export const AL_INDEX_ELEVATED_NT = -200;
 let allData = [];
 
 const getFirstValidValue = (...values) => (
-    values.find(value => value != null && value !== '' && value !== 'null') ?? null
+    values.find(value => value != null && value !== '' && value !== 'null' && value !== 'undefined') ?? null
 );
 
 const fetchData = async (url) => {
