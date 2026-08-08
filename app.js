@@ -3,8 +3,8 @@ import { updateStatusCard, renderTable, setLoading, showStatusMessage, initUI, s
 import { parseUtcTimeTag } from './calculations.js';
 
 // --- Anwendungskonstanten ---
-const PLASMA_API_URL = 'https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json';
-const MAG_API_URL = 'https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json';
+const PLASMA_API_URL = 'https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json';
+const MAG_API_URL = 'https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json';
 
 export const L1_DISTANCE_KM = 1500000;
 export const MS_PER_SEC = 1000;
@@ -37,7 +37,15 @@ const fetchData = async (url) => {
         throw new Error(`HTTP-Fehler beim Laden von ${url}: ${response.status}`);
     }
     const rawData = await response.json();
-    return rawData.slice(1);
+    const [header, ...rows] = rawData;
+
+    if (!Array.isArray(header)) {
+        throw new Error(`Unerwartetes Datenformat von ${url}`);
+    }
+
+    return rows.map(row => (
+        Object.fromEntries(header.map((key, index) => [key, row[index]]))
+    ));
 };
 
 const fetchSolarWindData = async () => {
@@ -49,43 +57,45 @@ const fetchSolarWindData = async () => {
             fetchData(MAG_API_URL)
         ]);
 
-        const MAG_TIME_INDEX = 0;
-        const MAG_BX_INDEX = 1;
-        const MAG_BY_INDEX = 2;
-        const MAG_BZ_INDEX = 3;
-        const MAG_BT_INDEX = 4;
-
         const magMap = new Map();
         magDataRaw.forEach(row => {
-            const timeTag = row[MAG_TIME_INDEX];
-            if (row[MAG_BX_INDEX] !== 'null' && parseFloat(row[MAG_BX_INDEX]) > -900 &&
-                row[MAG_BY_INDEX] !== 'null' && parseFloat(row[MAG_BY_INDEX]) > -900 &&
-                row[MAG_BZ_INDEX] !== 'null' && parseFloat(row[MAG_BZ_INDEX]) > -900) {
-                
+            const timeTag = row.time_tag;
+            const bx = row.bx ?? row.bx_gsm ?? row.bx_gse;
+            const by = row.by ?? row.by_gsm ?? row.by_gse;
+            const bz = row.bz ?? row.bz_gsm ?? row.bz_gse;
+            const bt = row.bt ?? row.total_bt;
+
+            if (timeTag &&
+                bx != null && bx !== 'null' && parseFloat(bx) > -900 &&
+                by != null && by !== 'null' && parseFloat(by) > -900 &&
+                bz != null && bz !== 'null' && parseFloat(bz) > -900) {
                 magMap.set(timeTag, {
-                    bx_nt: row[MAG_BX_INDEX],
-                    by_nt: row[MAG_BY_INDEX],
-                    bz_nt: row[MAG_BZ_INDEX],
-                    bt_nt: row[MAG_BT_INDEX] || 'N/A'
+                    bx_nt: bx,
+                    by_nt: by,
+                    bz_nt: bz,
+                    bt_nt: bt ?? 'N/A'
                 });
             }
         });
 
-        const processedData = plasmaDataRaw.map(row => {
-            const timeTag = row[0];
-            const magEntry = magMap.get(timeTag) || { bx_nt: 'N/A', by_nt: 'N/A', bz_nt: 'N/A', bt_nt: 'N/A' };
-            
-            const entry = {
-                time_tag: timeTag,
-                density: row[1],
-                speed: row[2],
-                bx_nt: magEntry.bx_nt, 
-                by_nt: magEntry.by_nt,
-                bz_nt: magEntry.bz_nt,
-                bt_nt: magEntry.bt_nt,
-            };
-            return calculateArrival(entry);
-        });
+        const processedData = plasmaDataRaw
+            .filter(row => row.time_tag)
+            .map(row => {
+                const timeTag = row.time_tag;
+                const magEntry = magMap.get(timeTag) || { bx_nt: 'N/A', by_nt: 'N/A', bz_nt: 'N/A', bt_nt: 'N/A' };
+                
+                const entry = {
+                    time_tag: timeTag,
+                    density: row.density,
+                    speed: row.speed,
+                    propagated_time_tag: row.propagated_time_tag ?? null,
+                    bx_nt: magEntry.bx_nt, 
+                    by_nt: magEntry.by_nt,
+                    bz_nt: magEntry.bz_nt,
+                    bt_nt: magEntry.bt_nt,
+                };
+                return calculateArrival(entry);
+            });
 
         if (processedData.length > 0) {
             const sortedByTime = [...processedData].sort((a, b) => 
@@ -108,7 +118,7 @@ const fetchSolarWindData = async () => {
                 return entryTimeMs >= cutoffTimeMs;
             });
 
-            showStatusMessage(`Daten (24h Quellen) erfolgreich geladen. Zeige ${allData.length} Einträge der letzten 2 Stunden (bis zum letzten Messwert, UTC). Nächste Aktualisierung in 1 Minute.`, false);
+            showStatusMessage(`Daten erfolgreich geladen. Zeige ${allData.length} Einträge der letzten 2 Stunden (bis zum letzten Messwert, UTC). Nächste Aktualisierung in 1 Minute.`, false);
 
         } else {
             allData = [];
