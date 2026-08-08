@@ -29,7 +29,14 @@ const getRequiredBuildupDuration = (sci) => {
  * Konvertiert den NOAA-Zeitstempel-String in ein UTC-Date-Objekt
  */
 export const parseUtcTimeTag = (timeTag) => {
-    return new Date(timeTag.replace(' ', 'T') + 'Z');
+    if (typeof timeTag !== 'string' || timeTag.trim() === '') {
+        return new Date(NaN);
+    }
+
+    const normalizedTimeTag = timeTag.includes('T') ? timeTag : timeTag.replace(' ', 'T');
+    const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(normalizedTimeTag);
+
+    return new Date(hasTimezone ? normalizedTimeTag : `${normalizedTimeTag}Z`);
 };
 
 /**
@@ -79,6 +86,7 @@ export const calculateArrival = (entry) => {
     const by = parseFloat(entry.by_nt);
     const bz = parseFloat(entry.bz_nt);
     const timeTag = entry.time_tag;
+    const measurementDate = parseUtcTimeTag(timeTag);
 
     let totalBt = 'N/A';
     if (!isNaN(bx) && !isNaN(by) && !isNaN(bz)) {
@@ -107,12 +115,21 @@ export const calculateArrival = (entry) => {
     let arrivalDate = 'Ungültige Geschw.';
     let estimatedOnset = 'N/A';
 
-    if (!isNaN(speed) && speed > 0 && speed <= 10000) {
+    const propagatedArrival = parseUtcTimeTag(entry.propagated_time_tag);
+
+    if (measurementDate instanceof Date && !isNaN(measurementDate) &&
+        propagatedArrival instanceof Date && !isNaN(propagatedArrival) &&
+        propagatedArrival.getTime() >= measurementDate.getTime()) {
+        arrivalDate = propagatedArrival;
+        travelTimeMs = propagatedArrival.getTime() - measurementDate.getTime();
+        travelTimeHours = travelTimeMs / (60 * 60 * 1000);
+        travelTimeMinutes = travelTimeMs / (60 * 1000);
+    } else if (!isNaN(speed) && speed > 0 && speed <= 10000 &&
+        measurementDate instanceof Date && !isNaN(measurementDate)) {
         const travelTimeSeconds = L1_DISTANCE_KM / speed;
         travelTimeHours = travelTimeSeconds / 3600;
         travelTimeMinutes = travelTimeSeconds / 60;
         travelTimeMs = travelTimeSeconds * MS_PER_SEC;
-        const measurementDate = parseUtcTimeTag(timeTag);
         arrivalDate = new Date(measurementDate.getTime() + travelTimeMs);
     }
     
