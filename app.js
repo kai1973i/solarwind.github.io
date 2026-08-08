@@ -50,7 +50,7 @@ const fetchData = async (url) => {
     return rows
         .filter(Array.isArray)
         .map(row => (
-        Object.fromEntries(header.map((key, index) => [key, row[index]]))
+            Object.fromEntries(header.map((key, index) => [key, row[index]]))
         ));
 };
 
@@ -72,9 +72,9 @@ const fetchSolarWindData = async () => {
             const bt = getFirstValidValue(row.bt, row.total_bt);
 
             if (timeTag &&
-                bx != null && bx !== 'null' && parseFloat(bx) > -900 &&
-                by != null && by !== 'null' && parseFloat(by) > -900 &&
-                bz != null && bz !== 'null' && parseFloat(bz) > -900) {
+                bx != null && parseFloat(bx) > -900 &&
+                by != null && parseFloat(by) > -900 &&
+                bz != null && parseFloat(bz) > -900) {
                 magMap.set(timeTag, {
                     bx_nt: bx,
                     by_nt: by,
