@@ -37,7 +37,7 @@ Die Anwendung verwendet die aktuellen NOAA-SWPC-Endpoints:
 - Plasma-/Geschwindigkeitsdaten: `https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json`
 - Magnetfelddaten: `https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json`
 
-Die Antwortdaten werden headerbasiert verarbeitet. Falls vorhanden, wird `propagated_time_tag` direkt als Ankunftszeit an der Erde verwendet.
+Die Antwortdaten werden sowohl im neueren Objektformat als auch im älteren headerbasierten Array-Format verarbeitet. Für Magnetfeldwerte bevorzugt die Anwendung `bx`/`by`/`bz` und nutzt bei Bedarf `*_gsm` bzw. `*_gse` als Fallback. Falls vorhanden, wird `propagated_time_tag` direkt als Ankunftszeit an der Erde verwendet.
 
 ## Lokale Nutzung
 

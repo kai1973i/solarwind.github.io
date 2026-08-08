@@ -46,6 +46,10 @@ const fetchData = async (url) => {
         throw new Error(`Unerwartetes Datenformat von ${url}`);
     }
 
+    if (rawData.length === 0) {
+        return [];
+    }
+
     if (rawData.every(row => row && typeof row === 'object' && !Array.isArray(row))) {
         return rawData;
     }
