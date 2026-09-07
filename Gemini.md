@@ -36,8 +36,8 @@ Das Projekt ist in mehrere Dateien aufgeteilt, um die Lesbarkeit und Wartbarkeit
 
 ## Datenquellen
 
-- **Plasma-Daten:** [NOAA SWPC - Real-Time Solar Wind Plasma](https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json)
-- **Magnetfeld-Daten:** [NOAA SWPC - Real-Time Solar Wind Magnetic Field](https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json)
+- **Plasma-Daten:** [NOAA SWPC - Real-Time Solar Wind Plasma](https://services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json)
+- **Magnetfeld-Daten:** [NOAA SWPC - Real-Time Solar Wind Magnetic Field](https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json)
 
 ## Ausführung
 
