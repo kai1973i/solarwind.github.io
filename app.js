@@ -3,8 +3,8 @@ import { updateStatusCard, renderTable, setLoading, showStatusMessage, initUI, s
 import { parseUtcTimeTag } from './calculations.js';
 
 // --- Anwendungskonstanten ---
-const PLASMA_API_URL = 'https://services.swpc.noaa.gov/json/solar-wind/plasma-7-day.json';
-const MAG_API_URL = 'https://services.swpc.noaa.gov/json/solar-wind/mag-7-day.json';
+const PLASMA_API_URL = 'https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json';
+const MAG_API_URL = 'https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json';
 
 export const L1_DISTANCE_KM = 1500000;
 export const MS_PER_SEC = 1000;
@@ -31,9 +31,11 @@ export const AL_INDEX_ELEVATED_NT = -200;
 
 let allData = [];
 
-const getFirstValidValue = (...values) => (
-    values.find(value => value != null && value !== '' && value !== 'null' && value !== 'undefined') ?? null
+const isValidMagneticComponent = (value) => (
+    value != null && Number.isFinite(Number(value)) && Number(value) > -900
 );
+
+const getMeasurementKey = (row) => `${row.source ?? ''}|${row.time_tag}`;
 
 const fetchData = async (url) => {
     const response = await fetch(url);
@@ -76,37 +78,43 @@ const fetchSolarWindData = async () => {
         ]);
 
         const magMap = new Map();
-        magDataRaw.forEach(row => {
-            const timeTag = row.time_tag;
-            const bx = getFirstValidValue(row.bx_gsm, row.bx, row.b1);
-            const by = getFirstValidValue(row.by_gsm, row.by, row.b2);
-            const bz = getFirstValidValue(row.bz_gsm, row.bz, row.b3);
-            const bt = getFirstValidValue(row.bt, row.total_bt);
+        magDataRaw
+            .filter(row => row.active === true)
+            .forEach(row => {
+                const timeTag = row.time_tag;
+                const bx = row.bx_gsm;
+                const by = row.by_gsm;
+                const bz = row.bz_gsm;
+                const bt = row.bt;
 
-            if (timeTag &&
-                bx != null && parseFloat(bx) > -900 &&
-                by != null && parseFloat(by) > -900 &&
-                bz != null && parseFloat(bz) > -900) {
-                magMap.set(timeTag, {
-                    bx_nt: bx,
-                    by_nt: by,
-                    bz_nt: bz,
-                    bt_nt: bt ?? 'N/A'
-                });
-            }
-        });
+                if (timeTag &&
+                    isValidMagneticComponent(bx) &&
+                    isValidMagneticComponent(by) &&
+                    isValidMagneticComponent(bz)) {
+                    magMap.set(getMeasurementKey(row), {
+                        bx_nt: bx,
+                        by_nt: by,
+                        bz_nt: bz,
+                        bt_nt: bt ?? 'N/A'
+                    });
+                }
+            });
 
         const processedData = plasmaDataRaw
-            .filter(row => row.time_tag)
+            .filter(row => row.active === true && row.time_tag)
             .map(row => {
                 const timeTag = row.time_tag;
-                const magEntry = magMap.get(timeTag) || { bx_nt: 'N/A', by_nt: 'N/A', bz_nt: 'N/A', bt_nt: 'N/A' };
+                const magEntry = magMap.get(getMeasurementKey(row)) || {
+                    bx_nt: 'N/A',
+                    by_nt: 'N/A',
+                    bz_nt: 'N/A',
+                    bt_nt: 'N/A'
+                };
                 
                 const entry = {
                     time_tag: timeTag,
-                    density: row.density,
-                    speed: row.speed,
-                    propagated_time_tag: row.propagated_time_tag ?? null,
+                    density: row.proton_density,
+                    speed: row.proton_speed,
                     bx_nt: magEntry.bx_nt, 
                     by_nt: magEntry.by_nt,
                     bz_nt: magEntry.bz_nt,

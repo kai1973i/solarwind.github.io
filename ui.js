@@ -113,6 +113,7 @@ export const renderTable = (data) => {
         let bzColor = 'text-gray-300';
         let bzIcon = '';
         const bz = parseFloat(entry.bz_nt);
+        const bzValue = Number.isFinite(bz) ? bz.toFixed(1) : 'N/A';
         if (!isNaN(bz)) {
             if (bz < -5) { 
                 bzColor = 'text-red-400 font-bold';
@@ -211,7 +212,7 @@ export const renderTable = (data) => {
         row.innerHTML += `<td class="py-3 px-6 text-left ${btColor}">${totalBtValue}</td>`;
         
         row.innerHTML += `<td class="py-3 px-6 text-left ${bzColor}">
-            ${bzIcon ? `<span class="mr-1">${bzIcon}</span>` : ''}${parseFloat(entry.bz_nt).toFixed(1)}
+            ${bzIcon ? `<span class="mr-1">${bzIcon}</span>` : ''}${bzValue}
         </td>`;
 
          row.innerHTML += `<td class="py-3 px-6 text-left ${alIndexColor}">

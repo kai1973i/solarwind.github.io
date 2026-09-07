@@ -32,12 +32,12 @@ Diese Anwendung visualisiert Echtzeit-Solarwind- und Magnetfelddaten des NOAA Sp
 
 ## Datenquellen
 
-Die Anwendung verwendet aktuelle NOAA-SWPC-JSON-Feeds mit rollierendem Zeitfenster:
+Die Anwendung verwendet die NOAA-SWPC-Echtzeitfeeds mit minütlichen RTSW-Messungen:
 
-- Plasma-/Geschwindigkeitsdaten: `https://services.swpc.noaa.gov/json/solar-wind/plasma-7-day.json`
-- Magnetfelddaten: `https://services.swpc.noaa.gov/json/solar-wind/mag-7-day.json`
+- Plasma-/Geschwindigkeitsdaten: `https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json`
+- Magnetfelddaten: `https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json`
 
-Die Antwortdaten werden sowohl im neueren Objektformat als auch im älteren headerbasierten Array-Format verarbeitet. Für Magnetfeldwerte bevorzugt die Anwendung GSM-nahe Felder wie `bx_gsm`/`by_gsm`/`bz_gsm` und unterstützt zusätzlich `bx`/`by`/`bz` sowie `b1`/`b2`/`b3`. Falls vorhanden, wird `propagated_time_tag` direkt als Ankunftszeit an der Erde verwendet.
+Die Quellen liefern Objektzeilen für mehrere Satellitenquellen. Die Anwendung verarbeitet ausschließlich die jeweils aktive Quelle (`active: true`) und verknüpft Plasma- und Magnetfeldwerte über den gemeinsamen Zeitstempel und die Quelle. Sie verwendet `proton_speed` und `proton_density` für die Plasmamessung sowie die GSM-Komponenten `bx_gsm`, `by_gsm` und `bz_gsm` für die Magnetfeldberechnungen. Die Ankunftszeit wird aus dem L1-Abstand und der Protonengeschwindigkeit geschätzt.
 
 ## Lokale Nutzung
 
