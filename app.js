@@ -3,8 +3,8 @@ import { updateStatusCard, renderTable, setLoading, showStatusMessage, initUI, s
 import { parseUtcTimeTag } from './calculations.js';
 
 // --- Anwendungskonstanten ---
-const PLASMA_API_URL = 'https://services.swpc.noaa.gov/json/solar-wind/plasma-7-day.json';
-const MAG_API_URL = 'https://services.swpc.noaa.gov/json/solar-wind/mag-7-day.json';
+const PLASMA_API_URL = 'https://services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json';
+const MAG_API_URL = 'https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json';
 
 export const L1_DISTANCE_KM = 1500000;
 export const MS_PER_SEC = 1000;
